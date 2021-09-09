@@ -189,10 +189,69 @@ for(i in 1:nrow(files.select2)){
   print(paste0("Completed copying recording ", i, " of ", nrow(files.select2), " recordings"))
 }
 
-
 #Remove empty files
 file.remove(files.0$path)
 
+#Check that all sites have 30 recordings
+files.use <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE))
+files.use$path <- row.names(files.use)
+files.use.sep <- files.use %>% 
+  separate(path, into=c("f1", "f2", "f3", "f4", "folder", "recording"), sep="/", remove=FALSE) %>% 
+  separate(recording, into=c("site", "datename", "timename"), sep="_", remove=FALSE) %>% 
+  mutate(year=as.numeric(str_sub(datename, 1, 4))) %>% 
+  dplyr::filter(!is.na(timename)) %>% 
+  dplyr::select(site, year, recording)
+
+files.count <- data.frame(table(files.use.sep$site, files.use.sep$year)) %>% 
+  rename(site=Var1, year=Var2) %>% 
+  dplyr::filter(Freq < 30, Freq > 0)
+
+#Select new files
+files.1 <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
+  dplyr::filter(size!=0)
+files.1$path <- row.names(files.1)
+files.1.sep <- files.1 %>% 
+  separate(path, into=c("f1", "f2", "f3", "f4", "folder", "file"), sep="/", remove=FALSE) %>% 
+  separate(file, into=c("site", "datename", "timename"), sep="_", remove=FALSE) %>% 
+  dplyr::filter(!is.na(timename))
+files.p.available <- files.p %>% 
+  dplyr::filter(!recording %in% files.1.sep$file)
+
+set.seed(1234)
+files.select3 <- data.frame()
+for(i in 4:nrow(files.count)){
+  
+  files.p.i <- files.p.available %>% 
+    dplyr::filter(site==files.count$site[i],
+                  year==files.count$year[i])
+  
+  files.select3.i <- files.p.i %>% 
+    sample_n(30 - files.count$Freq[i]) %>% 
+    dplyr::select(site, year, path, recording) %>% 
+    mutate(folder=files.count$folder[i])
+  
+  files.select3 <- rbind(files.select3, files.select3.i)
+  
+}
+
+#THESE FOUR SITES HAVE NO MORE RECORDINGS. CONSIDER REMOVING
+
+#Check filenames of 2021 data
+files.2021 <- read.csv("ServerRecordingList_2021.csv") %>% 
+  separate(recording, into=c("site2", "datename", "timename"), sep="_", remove=FALSE) %>% 
+  dplyr::filter(site!=site2)
+
+files.use <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE))
+files.use$path <- row.names(files.use)
+files.use.sep <- files.use %>% 
+  separate(path, into=c("f1", "f2", "f3", "f4", "folder", "recording"), sep="/", remove=FALSE) %>% 
+  separate(recording, into=c("site", "datename", "timename"), sep="_", remove=FALSE) %>% 
+  mutate(year=as.numeric(str_sub(datename, 1, 4))) %>% 
+  dplyr::filter(!is.na(timename)) %>% 
+  dplyr::select(site, year, recording)
+
+files.names <- files.2021 %>% 
+  inner_join(files.use.sep) 
 
 
 
