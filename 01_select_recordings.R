@@ -140,7 +140,58 @@ for(i in 1:nrow(files.copy)){
   print(paste0("Completed copying recording ", i, " of ", nrow(files.copy), " recordings"))
 }
 
+#Check 
+files.0 <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
+  dplyr::filter(size==0)
+files.0$path <- row.names(files.0)
+files.0.sep <- files.0 %>% 
+  separate(path, into=c("f1", "f2", "f3", "f4", "folder", "file"), sep="/", remove=FALSE) %>% 
+  separate(file, into=c("site", "datename", "timename"), sep="_", remove=FALSE) %>% 
+  mutate(year=str_sub(datename, 1, 4))
 
+#Select new files
+files.new <- data.frame(table(files.0.sep$site, files.0.sep$year, files.0.sep$folder)) %>% 
+  rename(site = Var1, year=Var2, folder=Var3) %>% 
+  dplyr::filter(Freq > 0)
+
+files.1 <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
+  dplyr::filter(size!=0)
+files.1$path <- row.names(files.1)
+files.1.sep <- files.1 %>% 
+  separate(path, into=c("f1", "f2", "f3", "f4", "folder", "file"), sep="/", remove=FALSE) %>% 
+  separate(file, into=c("site", "datename", "timename"), sep="_", remove=FALSE) %>% 
+  dplyr::filter(!is.na(timename))
+files.p.available <- files.p %>% 
+  dplyr::filter(!recording %in% files.1.sep$file)
+
+set.seed(1234)
+files.select2 <- data.frame()
+for(i in 1:nrow(files.new)){
+  
+  files.p.i <- files.p.available %>% 
+    dplyr::filter(site==files.new$site[i],
+                  year==files.new$year[i])
+  
+  files.select2.i <- files.p.i %>% 
+    sample_n(files.new$Freq[i]) %>% 
+    dplyr::select(site, year, path, recording) %>% 
+    mutate(folder=files.new$folder[i])
+  
+  files.select2 <- rbind(files.select2, files.select2.i)
+  
+}
+
+#Copy
+for(i in 1:nrow(files.select2)){
+  from.i <- files.select2$path[i]
+  to.i <- paste0("/Volumes/Contracts2/WLNP/", files.select2$folder[i], "/", files.select2$recording[i])
+  file.copy(from.i, to.i)
+  print(paste0("Completed copying recording ", i, " of ", nrow(files.select2), " recordings"))
+}
+
+
+#Remove empty files
+file.remove(files.0$path)
 
 
 
