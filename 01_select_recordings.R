@@ -127,21 +127,21 @@ files.copy <- files.select %>%
   mutate(file=ceiling(row_number()/300))
 
 for(i in 1:max(files.copy$file)){
-  if(!dir.exists(file.path(paste0("/Volumes/Contracts2/WLNP/", i)))){
-    dir.create(file.path(paste0("/Volumes/Contracts2/WLNP/", i)))
+  if(!dir.exists(file.path(paste0("/Volumes/Seagate4TB/WLNP/", i)))){
+    dir.create(file.path(paste0("/Volumes/Seagate4TB/WLNP/", i)))
   }
 }
 
 #Copy
-for(i in 1:nrow(files.copy)){
+for(i in 4620:nrow(files.copy)){
   from.i <- files.copy$path[i]
-  to.i <- paste0("/Volumes/Contracts2/WLNP/", files.copy$file[i], "/", files.copy$recording[i])
+  to.i <- paste0("/Volumes/Seagate4TB/WLNP/", files.copy$file[i], "/", files.copy$recording[i])
   file.copy(from.i, to.i)
   print(paste0("Completed copying recording ", i, " of ", nrow(files.copy), " recordings"))
 }
 
 #Check 
-files.0 <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
+files.0 <- file.info(list.files("/Volumes/Seagate4TB/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
   dplyr::filter(size==0)
 files.0$path <- row.names(files.0)
 files.0.sep <- files.0 %>% 
@@ -154,7 +154,7 @@ files.new <- data.frame(table(files.0.sep$site, files.0.sep$year, files.0.sep$fo
   rename(site = Var1, year=Var2, folder=Var3) %>% 
   dplyr::filter(Freq > 0)
 
-files.1 <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
+files.1 <- file.info(list.files("/Volumes/Seagate4TB/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
   dplyr::filter(size!=0)
 files.1$path <- row.names(files.1)
 files.1.sep <- files.1 %>% 
@@ -184,7 +184,7 @@ for(i in 1:nrow(files.new)){
 #Copy
 for(i in 1:nrow(files.select2)){
   from.i <- files.select2$path[i]
-  to.i <- paste0("/Volumes/Contracts2/WLNP/", files.select2$folder[i], "/", files.select2$recording[i])
+  to.i <- paste0("/Volumes/Seagate4TB/WLNP/", files.select2$folder[i], "/", files.select2$recording[i])
   file.copy(from.i, to.i)
   print(paste0("Completed copying recording ", i, " of ", nrow(files.select2), " recordings"))
 }
@@ -193,7 +193,7 @@ for(i in 1:nrow(files.select2)){
 file.remove(files.0$path)
 
 #Check that all sites have 30 recordings
-files.use <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE))
+files.use <- file.info(list.files("/Volumes/Seagate4TB/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE))
 files.use$path <- row.names(files.use)
 files.use.sep <- files.use %>% 
   separate(path, into=c("f1", "f2", "f3", "f4", "folder", "recording"), sep="/", remove=FALSE) %>% 
@@ -207,7 +207,7 @@ files.count <- data.frame(table(files.use.sep$site, files.use.sep$year)) %>%
   dplyr::filter(Freq < 30, Freq > 0)
 
 #Select new files
-files.1 <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
+files.1 <- file.info(list.files("/Volumes/Seagate4TB/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE)) %>%
   dplyr::filter(size!=0)
 files.1$path <- row.names(files.1)
 files.1.sep <- files.1 %>% 
@@ -219,7 +219,7 @@ files.p.available <- files.p %>%
 
 set.seed(1234)
 files.select3 <- data.frame()
-for(i in 4:nrow(files.count)){
+for(i in 3:nrow(files.count)){
   
   files.p.i <- files.p.available %>% 
     dplyr::filter(site==files.count$site[i],
@@ -234,6 +234,12 @@ for(i in 4:nrow(files.count)){
   
 }
 
+#Save out list of files
+files.all <- file.info(list.files("/Volumes/Seagate4TB/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE))
+files.all$path <- row.names(files.all)
+
+write.csv(files.all, "FinalFileList.csv", row.names = FALSE)
+
 #THESE FOUR SITES HAVE NO MORE RECORDINGS. CONSIDER REMOVING
 
 #Check filenames of 2021 data
@@ -241,7 +247,7 @@ files.2021 <- read.csv("ServerRecordingList_2021.csv") %>%
   separate(recording, into=c("site2", "datename", "timename"), sep="_", remove=FALSE) %>% 
   dplyr::filter(site!=site2)
 
-files.use <- file.info(list.files("/Volumes/Contracts2/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE))
+files.use <- file.info(list.files("/Volumes/Seagate4TB/WLNP", recursive=TRUE, full.names = TRUE, include.dirs=TRUE))
 files.use$path <- row.names(files.use)
 files.use.sep <- files.use %>% 
   separate(path, into=c("f1", "f2", "f3", "f4", "folder", "recording"), sep="/", remove=FALSE) %>% 
@@ -282,5 +288,5 @@ files.locs <- files.df %>%
   mutate(siteloc = gsub(site, pattern="0", replacement = "")) %>% 
   left_join(locs) %>% 
   dplyr::filter(!is.na(X)) %>% 
-  rename(lat=Y, lon=X) %>% 
+  rename(lat=Y, lon=X)
  
