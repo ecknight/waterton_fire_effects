@@ -111,7 +111,7 @@ dat <- read.csv("ExistingSamplingLocations.csv") %>%
           dplyr::select(X, Y))
  
 #2a. Read in and prepare----
-gis <- "/Volumes/ECK004/GIS/"
+gis <- "/Volumes/SSD/GIS"
 
 #DEM
 dem.r <- raster(paste0(gis, "Projects/WLNP/DEM_10m.tif"))
