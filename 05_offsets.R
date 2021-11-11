@@ -284,8 +284,10 @@ df.hum$p.boom <- 1-exp(-(1/predict(mb.boom, newdata = df.hum))*6)
 df.hum$p.call <- 1-exp(-(1/predict(mb.call, newdata = df.hum))*6)
 
 df.pred <- rbind(df.aru %>% 
-                   dplyr::select(survey, station, DateTime, detection),
+                   dplyr::select(survey, station, DateTime, detection, p.boom, p.call),
                  df.hum  %>% 
-                   dplyr::select(survey, station, DateTime, detection))
+                   dplyr::select(survey, station, DateTime, detection, p.boom, p.call)) %>% 
+  mutate(year=year(DateTime),
+         fire=ifelse(year <=2017, "before", "after"))
 
 write.csv(df.pred, "SurveyDataWithOffsets.csv", row.names=FALSE)
