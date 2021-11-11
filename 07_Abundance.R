@@ -111,10 +111,27 @@ cl0p.call <- cl0p
 #Poisson  with no covs for both detection types
 
 #4. Estimate
+
+#Boom
 ## mean of the poisson (including 0 counts and offsets too)
-lambda <- exp(cl0p$coef)
-lambda
+lambda.boom <- exp(cl0p.boom$coef)
+lambda.boom
 ## P(N=0) based on Poisson, which is the suitable but unoccupied probability
-exp(-lambda)
+exp(-lambda.boom)
 ## suitable and occupied
-1-exp(-lambda)
+1-exp(-lambda.boom)
+
+#Call
+## mean of the poisson (including 0 counts and offsets too)
+lambda.call <- exp(cl0p.call$coef)
+lambda.call
+## P(N=0) based on Poisson, which is the suitable but unoccupied probability
+exp(-lambda.call)
+## suitable and occupied
+1-exp(-lambda.call)
+
+#5. Save out----
+lambda <- data.frame(detection=c("boom", "call"),
+                     lambda=c(lambda.boom, lambda.call))
+
+write.csv(lambda, "LambdaEstimates.csv", row.names = FALSE)
