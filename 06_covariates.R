@@ -18,47 +18,51 @@ dat <- read.csv("SurveyDataWithOffsets.csv") %>%
   summarize(detection=max(detection)) %>% 
   ungroup()
 
-#Human surveys first
-locs.hum <- read.csv("Data/HumanData.csv") %>% 
-  rename(station=Site)
-
-dat.hum <- dat %>% 
-  dplyr::filter(survey=="human") %>% 
-  left_join(locs.hum)
-
-dat.hum.11 <- dat.hum %>% 
-  dplyr::filter(Zone=="11U") %>% 
-  st_as_sf(coords=c("Easting", "Northing"), crs=26911) %>% 
-  st_transform(crs=4326)
-  
-dat.hum.12 <- dat.hum %>% 
-  dplyr::filter(Zone=="12U") %>% 
-  st_as_sf(coords=c("Easting", "Northing"), crs=26912) %>% 
-  st_transform(crs=4326)
-
-dat.hum.sf <- rbind(dat.hum.11, dat.hum.12) %>% 
-  dplyr::select(survey, station, year, geometry)
-
 #ARU surveys
 locs.2020 <- read.csv("CommonNightawkSamplingLocationsExisting.csv") %>% 
-  rename(Latitude=Y, Longitude=X)
+  rename(Latitude=Y, Longitude=X) %>% 
+  group_by(Site) %>% 
+  sample_n(1) %>% #Randomly sample 1 of each of the highway 6 south 4-6 stations
+  ungroup()
+
 locs.2021 <- read.csv("CommonNightawkSamplingLocations2021.csv") %>% 
+  dplyr::filter(Objective=="Gap") %>%  #only include new stations from 2021
   dplyr::select(Site, Latitude, Longitude)
-locs.bu <- read.csv("Data/BU_WLNP_locations.csv") %>% 
-  rename(Site=site, Latitude=Y, Longitude=X) %>% 
+
+locs.wt <- read.csv("Data/PARKS CANADA_locations_202119_WLNPfilter.csv") %>% 
+  rename(Site = location, Latitude=latitude, Longitude=longitude) %>% 
+  dplyr::filter(!Site %in% locs.2020$Site,
+                !Site=="WLNP-SUM-09") %>% #remove old WLNP-SUM-09 coordinates
   dplyr::select(Site, Longitude, Latitude)
-locs.wt <- read.csv("Data/APPENDED_REPORT.csv") %>% 
-  rename(Site=location, Latitude=latitude, Longitude=longitude) %>% 
-  dplyr::select(Site, Longitude, Latitude)
-locs.aru <- rbind(locs.2020, locs.2021, locs.bu, locs.wt) %>% 
+
+locs.aru <- rbind(locs.2020, locs.2021, locs.wt) %>% 
   rename(station=Site) %>% 
+  mutate(Longitude = round(as.numeric(Longitude), digits=5),
+         Latitude = round(as.numeric(Latitude), digits=5)) %>% 
   unique()
 
-dat.aru.sf <- dat %>% 
-  dplyr::filter(survey=="ARU") %>% 
+dat.sf <- dat %>% 
   mutate(station = gsub(pattern="-00", replacement="-", x=station),
          station = gsub(pattern="-0", replacement="-", x=station)) %>% 
-  inner_join(locs.aru %>% 
+  mutate(station = gsub(pattern="CONI-GAP", replacement="GAP", x=station),
+         station = gsub(pattern="Cardston Gate 0", replacement = "CAR-", x=station),
+         station = gsub(pattern="Cardson Entrance 0", replacement = "ENT-", x=station),
+         station = gsub(pattern="Eskerine 0", replacement = "ESK-", x=station),
+         station = gsub(pattern="HORSESHOE-", replacement = "HORSE-", x=station),
+         station = gsub(pattern="LAKEVIEW-", replacement = "LAKE-", x=station),
+         station = gsub(pattern="OILBASIN", replacement = "OIL", x=station),
+         station = gsub(pattern="Red Rock Parkway ", replacement = "RRP-", x=station),
+         station = gsub(pattern="Belly River 0", replacement = "BEL-", x=station),
+         station = gsub(pattern="Pincher Entrance Transect 0", replacement = "PIN-", x=station),
+         station = gsub(pattern="-00", replacement="-", x=station),
+         station = gsub(pattern="-0", replacement="-", x=station),
+         station = gsub(pattern="Highway 6 North 08", replacement="HWY6-8", x=station),
+         station = gsub(pattern="Highway 6 North 10", replacement="HWY6-10", x=station),
+         station = gsub(pattern="Highway 6 North 11", replacement="HWY6-11", x=station),
+         station = gsub(pattern="Highway 6 South 03", replacement="HWY6-3", x=station),
+         station = gsub(pattern="Highway 6 North 02", replacement="HWY6-2", x=station),
+         station = gsub(pattern="Highway 6 North 05", replacement="HWY6-5", x=station)) %>% 
+ inner_join(locs.aru %>% 
               mutate(station = gsub(pattern="CONI-GAP", replacement="GAP", x=station),
                      station = gsub(pattern="Cardston Gate 0", replacement = "CAR-", x=station),
                      station = gsub(pattern="Cardson Entrance 0", replacement = "ENT-", x=station),
@@ -78,10 +82,9 @@ dat.aru.sf <- dat %>%
                      station = gsub(pattern="Highway 6 North 02", replacement="HWY6-2", x=station),
                      station = gsub(pattern="Highway 6 North 05", replacement="HWY6-5", x=station))) %>% 
   st_as_sf(coords=c("Longitude", "Latitude"), crs=4326) %>% 
-  dplyr::select(survey, station, year, geometry)
-
-dat.sf <- rbind(dat.aru.sf, dat.hum.sf) %>% 
-  st_transform(crs=26912)
+  st_transform(crs=26912) %>% 
+  dplyr::select(station, geometry) %>% 
+  unique()
 
 #2. Read data and prepare----
 gis <- "/Volumes/SSD/GIS/"
@@ -130,9 +133,6 @@ dat.covs <- dat.sf %>%
   cbind(data.frame(dat.sf)) %>% 
   dplyr::select(-geometry) %>% 
   cbind(covs) %>% 
-  dplyr::filter(!is.na(Soil)) %>% 
-  mutate(FireTime=year-FireHistory,
-         FireTime=ifelse(FireTime < 0, NA, FireTime),
-         FireSeverity = ifelse(year > 2017, FireSeverity, NA)) 
+  dplyr::filter(!is.na(Soil))
 
 write.csv(dat.covs, "SurveyLocationsWithCovs.csv", row.names=FALSE)
