@@ -111,7 +111,7 @@ dat <- read.csv("ExistingSamplingLocations.csv") %>%
           dplyr::select(X, Y))
  
 #2a. Read in and prepare----
-gis <- "/Volumes/SSD/GIS"
+gis <- "/Volumes/SSD/GIS/"
 
 #DEM
 dem.r <- raster(paste0(gis, "Projects/WLNP/DEM_10m.tif"))
@@ -161,8 +161,7 @@ write_sf(trails, "MergedTrails.shp")
 trails.sp <- readOGR("MergedTrails.shp")
 trails.sp$status <- as.factor(trails.sp$status)
 #trails.r <- raster::rasterize(trails.sp, dem.r, field="status")
-#writeRaster(trails.r, "MergedTrails.tiff")
-trails.r <- raster("MergedTrails.tif")
+#writeRaster(rasters/trails.r, "MergedTrails.tiff")
 
 #2b. Extract covs----
 coords <- dat %>% 

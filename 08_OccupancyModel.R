@@ -48,6 +48,7 @@ dat.cov <- dat %>%
 #3. Format for occupancy----
 lambda <- read.csv("LambdaEstimates.csv")
 
+
 #Boom first
 dat.boom <- dat.cov %>% 
   dplyr::filter(survey=="ARU")

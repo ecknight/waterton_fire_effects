@@ -89,6 +89,7 @@ dat.sf <- dat %>%
 #2. Read data and prepare----
 gis <- "/Volumes/SSD/GIS/"
 
+#2a. Point level - DEM, fire----
 #DEM
 dem.r <- raster(paste0(gis, "Projects/WLNP/DEM_10m.tif"))
 names(dem.r) <- "Elevation"
@@ -103,7 +104,11 @@ fire_sev <- read_sf(paste0(gis, "Projects/WLNP/Kenow 2017 Burn severity/Kenow_se
 fire_sev.r <- fasterize(fire_sev, raster=dem.r, field="gridcode")
 names(fire_sev.r) <- "FireSeverity"
 
-#Soil
+#2b. Buffer - trails, soils, veg
+#Trails
+trails.r <- raster("raster/MergedTrails.tif")
+
+#Soil - NOT SURE WHAT TO DO WITH THIS####
 soil <- read_sf(paste0(gis, "Projects/WLNP/Soils_separate_fields/Waterton_Lakes_NP_Soils_1976_Dec_13_2017.shp")) %>% 
   mutate(PARENT_MAT=as.factor(PARENT_MAT))
 soil.r <- fasterize(soil, raster=dem.r, field="PARENT_MAT")
@@ -116,12 +121,124 @@ veg <- read_sf(paste0(gis, "/Projects/WLNP/Veg/WATE_VegMap.shp")) %>%
          HT_MOD=as.factor(HT_MOD))
 veg.r <- fasterize(veg, raster=dem.r, field="MAP_BDESC")
 names(veg.r) <- "Vegetation"
+levels(veg$MAP_BDESC)
+
+#Water
+rclmat <- matrix(c(0, 24.5, 0, 
+                   24.5, 25.5, 1,
+                   25.5, 30.5, 0,
+                   30.5, 31.5, 1,
+                   31.5, 37.5, 0,
+                   NA, NA, NA), 
+                 ncol=3, byrow=TRUE) 
+water <- reclassify(veg.r, rclmat)
+plot(water)
+names(water) <- "water"
+writeRaster(water, "rasters/water.tif", overwrite=TRUE)
+
+#Wetland
+rclmat <- matrix(c(0, 25.5, 0, 
+                   25.5, 26.5, 1,
+                   26.5, 29.5, 0,
+                   29.5, 30.5, 1,
+                   30.5, 34.5, 0,
+                   34.5, 35.5, 1,
+                   35.5, 37.5, 0,
+                   NA, NA, NA), 
+                 ncol=3, byrow=TRUE) 
+wetland <- reclassify(veg.r, rclmat)
+plot(wetland)
+names(wetland) <- "wetland"
+writeRaster(wetland, "rasters/wetland.tif", overwrite=TRUE)
+
+#Wet
+rclmat <- matrix(c(0, 24.5, 0, 
+                   24.5, 26.5, 1,
+                   26.5, 29.5, 0,
+                   29.5, 31.5, 1,
+                   31.5, 34.5, 0,
+                   34.5, 35.5, 1,
+                   35.5, 37.5, 0,
+                   NA, NA, NA), 
+                 ncol=3, byrow=TRUE) 
+wet <- reclassify(veg.r, rclmat)
+plot(wet)
+names(wet) <- "wet"
+writeRaster(wet, "rasters/wet.tif", overwrite=TRUE)
+
+#Pine
+rclmat <- matrix(c(0, 17.5, 0, 
+                   17.5, 20.5, 1,
+                   20.5, 37.5, 0,
+                   NA, NA, NA), 
+                 ncol=3, byrow=TRUE) 
+pine <- reclassify(veg.r, rclmat)
+plot(pine)
+names(pine) <- "pine"
+writeRaster(pine, "rasters/pine.tif", overwrite=TRUE)
+
+#Grassland
+rclmat <- matrix(c(0, 15.5, 0, 
+                   15.5, 16.5, 1,
+                   16.5, 37.5, 0,
+                   NA, NA, NA), 
+                 ncol=3, byrow=TRUE) 
+grass <- reclassify(veg.r, rclmat)
+plot(grass)
+names(grass) <- "grass"
+writeRaster(grass, "rasters/grass.tif", overwrite=TRUE)
+
+#Developed
+rclmat <- matrix(c(0, 27.5, 0, 
+                   27.5, 29.5, 1,
+                   29.5, 37.5, 0,
+                   NA, NA, NA), 
+                 ncol=3, byrow=TRUE) 
+develop <- reclassify(veg.r, rclmat)
+plot(develop)
+names(develop) <- "develop"
+writeRaster(develop, "rasters/develop.tif", overwrite=TRUE)
+
+#Veg cover
 canopy.r <- fasterize(veg, raster=dem.r, field="DENS_MOD")
 names(canopy.r) <- "VegetationCover"
+writeRaster(canopy.r, "rasters/cover.tif", overwrite=TRUE)
+
+#Veg height
 height.r <- fasterize(veg, raster=dem.r, field="HT_MOD")
 names(height.r) <- "VegetationHeight"
+writeRaster(height.r, "rasters/height.tif", overwrite=TRUE)
 
-layers <- stack(dem.r, fire_hist.r, fire_sev.r, soil.r, veg.r, canopy.r, height.r)
+files <- list.files(path="rasters/", pattern="*.tif")
+radii <- c(300)
+loop <- expand.grid(files=files, radius=radii)
+
+for(i in 1:nrow(loop)){
+  name.i <- str_sub(loop$files[i], -100, -5)
+  layer.i <- raster(paste0("rasters/", as.character(loop$files[i])))
+  radius.i <- loop$radius[i]
+  if(name.i %in% c("cover", "height")){
+    layer.focal <- focal(layer.i, focalWeight(layer.i, d=radius.i, type='circle'), na.rm=TRUE)
+  }
+  else{
+    layer.focal <- focal(layer.i, focalWeight(layer.i, d=radius.i, type='circle'))
+  }
+  names(layer.focal) <- paste0(name.i,"-",radius.i)
+  writeRaster(layer.focal, paste0("rasters/",name.i,"-",radius.i,".tif"), overwrite=TRUE)
+  print(paste0("Completed raster ", name.i, "-", radius.i, " - ", i, " of ", nrow(loop), " rasters"))
+}
+
+cover.300 <- raster("rasters/cover-300.tif")
+develop.300 <- raster("rasters/develop-300.tif")
+grass.300 <- raster("rasters/grass-300.tif")
+height.300 <- raster("rasters/height-300.tif")
+trails.300 <- raster("rasters/MergedTrails-300.tif")
+pine.300 <- raster("rasters/pine-300.tif")
+water.300 <- raster("rasters/water-300.tif")
+wet.300 <- raster("rasters/wet-300.tif")
+wetland.300 <- raster("rasters/wetland-300.tif")
+
+layers <- stack(dem.r, fire_hist.r, fire_sev.r, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, water.300, wet.300, wetland.300)
 
 #3. Extract----
 coords <- dat.sf %>% 
@@ -132,7 +249,6 @@ dat.covs <- dat.sf %>%
   st_coordinates() %>% 
   cbind(data.frame(dat.sf)) %>% 
   dplyr::select(-geometry) %>% 
-  cbind(covs) %>% 
-  dplyr::filter(!is.na(Soil))
+  cbind(covs)
 
 write.csv(dat.covs, "SurveyLocationsWithCovs.csv", row.names=FALSE)
