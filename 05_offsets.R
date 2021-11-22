@@ -283,6 +283,18 @@ df.hum <- read.csv("Data/HumanData.csv") %>%
 df.hum$p.boom <- 1-exp(-(1/predict(mb.boom, newdata = df.hum))*6)
 df.hum$p.call <- 1-exp(-(1/predict(mb.call, newdata = df.hum))*6)
 
+
+#14. Correct for differences in recorder & recognizer EDR----
+#From Yip et al. Fig 2A SM2 @ 4000 Hz
+SM2 <- 0.7 
+
+#Recall at score 60 from known distance clips
+rec <-  0.5626959
+
+df.hum$p.boom <- df.hum$p.boom*(1/SM2)*(1/rec)
+df.hum$p.call <- df.hum$p.call*(1/SM2)*(1/rec)
+
+#15. Put together----
 df.pred <- rbind(df.aru %>% 
                    dplyr::select(survey, station, DateTime, detection, p.boom, p.call),
                  df.hum  %>% 
