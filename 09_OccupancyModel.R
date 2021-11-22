@@ -43,18 +43,22 @@ dat.cov <- dat %>%
   mutate(FireTime=year-FireHistory,
          FireTime=ifelse(FireTime < 0, NA, FireTime),
          FireTime=ifelse(is.na(FireTime), 200, FireTime),
-         FireSeverity = ifelse(year > 2017, FireSeverity, NA)) 
+         FireSeverity = ifelse(year > 2017, FireSeverity, NA))  %>% 
+  dplyr::filter(!is.na(pine.300),
+                !is.na(sand.300),
+                !is.na(cover.300))
 
 #3. Format for occupancy----
 lambda <- read.csv("LambdaEstimates.csv")
 
+#Boom
+#dat.boom <- dat.cov %>% 
+#  dplyr::filter(survey=="ARU")
 
-#Boom first
-dat.boom <- dat.cov %>% 
-  dplyr::filter(survey=="ARU")
+dat.boom <- dat.cov
 
 station.boom <- dat.boom %>% 
-  dplyr::select(station, year, fire, ID, X, Y, Elevation, FireHistory, FireSeverity, Soil, Vegetation, VegetationCover, VegetationHeight, FireTime) %>% 
+  dplyr::select(station, year, fire, ID, X, Y, Elevation, FireTime, grass.300, sand.300, trails.300, cover.300, Elevation) %>% 
   unique()
 
 y.boom <- dat.boom %>% 
@@ -76,14 +80,9 @@ J.boom <- ncol(y.boom)
 Z.boom <- matrix(1, M.boom*J.boom, 1)
 lamvec.boom <- rep(lambda$lambda[1], nrow(station.boom))
 
-X.boom <- matrix(1, M.boom, 1)
-Xfire.boom <- model.matrix(~FireTime, station.boom)
-
 #Call
-dat.call <- dat.cov
-
 station.call <- dat.call %>% 
-  dplyr::select(station, year, fire, ID, X, Y, Elevation, FireHistory, FireSeverity, Soil, Vegetation, VegetationCover, VegetationHeight, FireTime) %>% 
+  dplyr::select(station, year, fire, ID, X, Y, Elevation, FireTime, grass.300, sand.300, trails.300, cover.300, Elevation) %>% 
   unique()
 
 y.call <- dat.call %>% 
@@ -103,34 +102,111 @@ p.call <- dat.call %>%
 M.call <- nrow(y.call)
 J.call <- ncol(y.call)
 Z.call <- matrix(1, M.call*J.call, 1)
-lamvec.call <- rep(lambda$lambda[2], nrow(station.call))
+lamvec.call <- rep(lambda$lambda[1], nrow(station.call))
 
-X.call <- matrix(1, M.call, 1)
-Xfire.call <- model.matrix(~FireTime, station.call)
-
-#4. Model----
+#4. Model boom----
 #method <- "Nelder-Mead" # fail fast
-#method <- "SANN"
-method <- "DE" # slow and sure
+method <- "SANN"
+#method <- "DE" # slow and sure
+
+X.boom <- matrix(1, M.boom, 1)
+Xveg1.boom <- model.matrix(~grass.300*cover.300 + sand.300, station.boom)
+Xveg2.boom <- model.matrix(~grass.300*cover.300, station.boom)
+Xveg3.boom <- model.matrix(~grass.300 + cover.300 + sand.300, station.boom)
+Xveg4.boom <- model.matrix(~grass.300 + cover.300, station.boom)
+Xveg5.boom <- model.matrix(~grass.300 + sand.300, station.boom)
+Xveg6.boom <- model.matrix(~cover.300 + sand.300, station.boom)
+Xveg7.boom <- model.matrix(~grass.300, station.boom)
+Xveg8.boom <- model.matrix(~cover.300, station.boom)
+Xveg9.boom <- model.matrix(~sand.300, station.boom)
+
+#Xfire.boom <- model.matrix(~FireTime, station.boom)
 
 #Boom
-o00.boom <- mvocc(y.boom, X.boom, Z.boom, p.boom, lamvec.boom, method=method)
-ofire.boom <- mvocc(y.boom, Xfire.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.null.boom <- mvocc(y.boom, X.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg1.boom <- mvocc(y.boom, Xveg1.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg2.boom <- mvocc(y.boom, Xveg2.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg3.boom <- mvocc(y.boom, Xveg3.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg4.boom <- mvocc(y.boom, Xveg4.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg5.boom <- mvocc(y.boom, Xveg5.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg6.boom <- mvocc(y.boom, Xveg6.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg7.boom <- mvocc(y.boom, Xveg7.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg8.boom <- mvocc(y.boom, Xveg8.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg9.boom <- mvocc(y.boom, Xveg9.boom, Z.boom, p.boom, lamvec.boom, method=method)
 
-aic <- AIC(o00.boom, ofire.boom)
+aic <- AIC(mod.null.boom, mod.veg1.boom, mod.veg2.boom, mod.veg3.boom, mod.veg4.boom, mod.veg5.boom, mod.veg6.boom, mod.veg7.boom, mod.veg8.boom, mod.veg9.boom)
 aic
 
-best.boom <- o00.boom
+mod.veg.boom <- mod.veg5.boom
 
-#Call
-o00.call <- mvocc(y.call, X.call, Z.call, p.call, lamvec.call, method=method)
-ofire.call <- mvocc(y.call, Xfire.call, Z.call, p.call, lamvec.call, method=method)
+Xvegelev.boom <- model.matrix(~grass.300 + sand.300 + Elevation, station.boom)
+Xvegtrails.boom <- model.matrix(~grass.300 + sand.300 + trails.300, station.boom)
 
-aic <- AIC(o00.call, ofire.call)
+mod.vegelev.boom <- mvocc(y.boom, Xvegelev.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.vegtrails.boom <- mvocc(y.boom, Xvegtrails.boom, Z.boom, p.boom, lamvec.boom, method=method)
+
+aic <- AIC(mod.veg.boom, mod.vegelev.boom, mod.vegtrails.boom)
 aic
 
-best.call <- o00.call
+Xvegfire.boom <- model.matrix(~grass.300 + sand.300 + FireTime, station.boom)
 
-#5. Probability of used----
-plogis(best.boom$coef[max(length(best.boom$coef))])
-plogis(best.call$coef[max(length(best.call$coef))]) # used
+mod.vegfire.boom <- mvocc(y.boom, Xvegfire.boom, Z.boom, p.boom, lamvec.boom, method=method)
+
+aic <- AIC(mod.veg.boom, mod.vegfire.boom)
+aic
+
+best.boom <- mod.veg.boom
+
+
+#5. Model call----
+#method <- "Nelder-Mead" # fail fast
+method <- "SANN"
+#method <- "DE" # slow and sure
+
+X.call <- matrix(1, M.call, 1)
+Xveg1.call <- model.matrix(~grass.300*cover.300 + sand.300, station.call)
+Xveg2.call <- model.matrix(~grass.300*cover.300, station.call)
+Xveg3.call <- model.matrix(~grass.300 + cover.300 + sand.300, station.call)
+Xveg4.call <- model.matrix(~grass.300 + cover.300, station.call)
+Xveg5.call <- model.matrix(~grass.300 + sand.300, station.call)
+Xveg6.call <- model.matrix(~cover.300 + sand.300, station.call)
+Xveg7.call <- model.matrix(~grass.300, station.call)
+Xveg8.call <- model.matrix(~cover.300, station.call)
+Xveg9.call <- model.matrix(~sand.300, station.call)
+
+#Xfire.call <- model.matrix(~FireTime, station.call)
+
+#call
+mod.null.call <- mvocc(y.call, X.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg1.call <- mvocc(y.call, Xveg1.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg2.call <- mvocc(y.call, Xveg2.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg3.call <- mvocc(y.call, Xveg3.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg4.call <- mvocc(y.call, Xveg4.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg5.call <- mvocc(y.call, Xveg5.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg6.call <- mvocc(y.call, Xveg6.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg7.call <- mvocc(y.call, Xveg7.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg8.call <- mvocc(y.call, Xveg8.call, Z.call, p.call, lamvec.call, method=method)
+mod.veg9.call <- mvocc(y.call, Xveg9.call, Z.call, p.call, lamvec.call, method=method)
+
+aic <- AIC(mod.null.call, mod.veg1.call, mod.veg2.call, mod.veg3.call, mod.veg4.call, mod.veg5.call, mod.veg6.call, mod.veg7.call, mod.veg8.call, mod.veg9.call)
+aic
+
+mod.veg.call <- mod.veg7.call
+
+Xvegelev.call <- model.matrix(~grass.300 + Elevation, station.call)
+Xvegtrails.call <- model.matrix(~grass.300 + trails.300, station.call)
+
+mod.vegelev.call <- mvocc(y.call, Xvegelev.call, Z.call, p.call, lamvec.call, method=method)
+mod.vegtrails.call <- mvocc(y.call, Xvegtrails.call, Z.call, p.call, lamvec.call, method=method)
+
+aic <- AIC(mod.veg.call, mod.vegelev.call, mod.vegtrails.call)
+aic
+
+Xvegfire.call <- model.matrix(~grass.300 + FireTime, station.call)
+
+mod.vegfire.call <- mvocc(y.call, Xvegfire.call, Z.call, p.call, lamvec.call, method=method)
+
+aic <- AIC(mod.veg.call, mod.vegfire.call)
+aic
+
+best.call <- mod.veg.call
