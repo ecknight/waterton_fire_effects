@@ -8,6 +8,8 @@ library(raster)
 library(sp)
 library(fasterize)
 library(lubridate)
+library(corrplot)
+library(usdm)
 
 options(scipen=99999)
 
@@ -106,13 +108,34 @@ names(fire_sev.r) <- "FireSeverity"
 
 #2b. Buffer - trails, soils, veg
 #Trails
-trails.r <- raster("raster/MergedTrails.tif")
+trails.r <- raster("rasters/MergedTrails.tif")
+plot(trails.r)
+rclmat <- matrix(c(1, 2, 1, 
+                   NA, NA, 0), 
+                 ncol=3, byrow=TRUE) 
+trails <- reclassify(trails.r, rclmat)
+plot(trails)
+names(trails) <- "trails"
+writeRaster(trails, "rasters/trails.tif", overwrite=TRUE)
 
 #Soil - NOT SURE WHAT TO DO WITH THIS####
 soil <- read_sf(paste0(gis, "Projects/WLNP/Soils_separate_fields/Waterton_Lakes_NP_Soils_1976_Dec_13_2017.shp")) %>% 
   mutate(PARENT_MAT=as.factor(PARENT_MAT))
 soil.r <- fasterize(soil, raster=dem.r, field="PARENT_MAT")
 names(soil.r) <- "Soil"
+levels(soil$PARENT_MAT)
+rclmat <- matrix(c(0, 2.5, 1, 
+                   2.5, 5.5, 0,
+                   5.5, 6.5, 0,
+                   6.5, 11.5, 0,
+                   11.5, 12.5, 0,
+                   12.5, 13.5, 0,
+                   NA, NA, NA), 
+                 ncol=3, byrow=TRUE) 
+sand <- reclassify(soil.r, rclmat)
+plot(sand)
+names(sand) <- "sand"
+writeRaster(sand, "rasters/sand.tif", overwrite=TRUE)
 
 #Veg
 veg <- read_sf(paste0(gis, "/Projects/WLNP/Veg/WATE_VegMap.shp")) %>% 
@@ -137,7 +160,9 @@ names(water) <- "water"
 writeRaster(water, "rasters/water.tif", overwrite=TRUE)
 
 #Wetland
-rclmat <- matrix(c(0, 25.5, 0, 
+rclmat <- matrix(c(0, 12.5, 0, 
+                   12.5, 14.5, 1,
+                   14.5, 25.5, 0,
                    25.5, 26.5, 1,
                    26.5, 29.5, 0,
                    29.5, 30.5, 1,
@@ -210,6 +235,7 @@ names(height.r) <- "VegetationHeight"
 writeRaster(height.r, "rasters/height.tif", overwrite=TRUE)
 
 files <- list.files(path="rasters/", pattern="*.tif")
+files <- "sand.tif"
 radii <- c(300)
 loop <- expand.grid(files=files, radius=radii)
 
@@ -232,13 +258,14 @@ cover.300 <- raster("rasters/cover-300.tif")
 develop.300 <- raster("rasters/develop-300.tif")
 grass.300 <- raster("rasters/grass-300.tif")
 height.300 <- raster("rasters/height-300.tif")
-trails.300 <- raster("rasters/MergedTrails-300.tif")
+trails.300 <- raster("rasters/trails-300.tif")
 pine.300 <- raster("rasters/pine-300.tif")
+sand.300 <- raster("rasters/sand-300.tif")
 water.300 <- raster("rasters/water-300.tif")
 wet.300 <- raster("rasters/wet-300.tif")
 wetland.300 <- raster("rasters/wetland-300.tif")
 
-layers <- stack(dem.r, fire_hist.r, fire_sev.r, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, water.300, wet.300, wetland.300)
+layers <- stack(dem.r, fire_hist.r, fire_sev.r, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, sand.300, water.300, wet.300, wetland.300)
 
 #3. Extract----
 coords <- dat.sf %>% 
@@ -252,3 +279,30 @@ dat.covs <- dat.sf %>%
   cbind(covs)
 
 write.csv(dat.covs, "SurveyLocationsWithCovs.csv", row.names=FALSE)
+
+#4. VIF----
+covs.vif <- dat.covs %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, sand.300, water.300, wet.300, wetland.300)
+M <- cor(covs.vif, use="complete.obs")
+M
+corrplot(M)
+
+vif(covs.vif)
+#take out wet
+
+covs.vif <- dat.covs %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, sand.300, water.300, wetland.300)
+M <- cor(covs.vif, use="complete.obs")
+M
+corrplot(M)
+
+vif(covs.vif)
+#take out height
+
+covs.vif <- dat.covs %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, trails.300, pine.300, sand.300, water.300, wetland.300)
+M <- cor(covs.vif, use="complete.obs")
+M
+corrplot(M)
+
+vif(covs.vif)
