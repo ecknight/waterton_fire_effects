@@ -1,5 +1,4 @@
-
-
+library(tidyverse)
 
 #1. Read in & wrangle data for a score of 60----
 dist <- read.csv("Data/FinalClipListAndRecognizerResults.csv")
@@ -28,6 +27,8 @@ AIC(md1, md2)
 #' We pick `md1` over `md2` based on AIC
 EDR <- unname(sqrt(1/coef(md1)))
 EDR
+
+write.csv(EDR, "EDR.csv", row.names = FALSE)
 
 #4. Calculate recall----
 sum(dist.all$detection)/nrow(dist.all)
