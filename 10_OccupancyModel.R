@@ -81,6 +81,8 @@ Z.boom <- matrix(1, M.boom*J.boom, 1)
 lamvec.boom <- rep(lambda$lambda[1], nrow(station.boom))
 
 #Call
+dat.call <- dat.cov
+
 station.call <- dat.call %>% 
   dplyr::select(station, year, fire, ID, X, Y, Elevation, FireTime, grass.300, sand.300, trails.300, cover.300, Elevation) %>% 
   unique()
@@ -156,7 +158,9 @@ aic <- AIC(mod.veg.boom, mod.vegfire.boom)
 aic
 
 best.boom <- mod.veg.boom
+summary(best.boom)
 
+saveRDS(best.boom, "OccupancyModel_Boom.rds")
 
 #5. Model call----
 #method <- "Nelder-Mead" # fail fast
@@ -210,3 +214,46 @@ aic <- AIC(mod.veg.call, mod.vegfire.call)
 aic
 
 best.call <- mod.veg.call
+summary(best.call)
+
+saveRDS(best.call, "OccupancyModel_Call.rds")
+
+#6. Estimates----
+best.boom$coef
+best.call$coef
+
+#6a. Suitability----
+delta.boom <- data.frame(delta = plogis(drop(Xveg5.boom %*% best.boom$coef[1:3])),
+                         sa=station.boom$station)
+summary(delta.boom$delta)
+
+delta.call <- data.frame(delta = plogis(drop(Xveg7.call %*% best.call$coef[1:2])),
+                         sa=station.call$station)
+summary(delta.call$delta)
+
+#6b. Occupied----
+summary(1-exp(-lambda$lambda[1]))
+summary(1-exp(-lambda$lambda[2]))
+
+#6c. Active----
+summary(as.numeric(p.boom))
+summary(as.numeric(p.call))
+
+#6d. Used----
+plogis(best.boom$coef[4])
+plogis(best.call$coef[3])
+
+#6e. Density----
+edr <- read.csv("EDR.csv")[1,1]
+
+estimates.boom <- delta.boom %>% 
+  cbind(lamvec.boom) %>% 
+  rename(lambda = lamvec.boom) %>% 
+  mutate(density = delta*lambda/edr)
+mean(estimates.boom$density)
+
+estimates.call <- delta.call %>% 
+  cbind(lamvec.call) %>% 
+  rename(lambda = lamvec.call) %>% 
+  mutate(density = delta*lambda/edr)
+mean(estimates.call$density)
