@@ -106,7 +106,7 @@ fire_sev <- read_sf(paste0(gis, "Projects/WLNP/Kenow 2017 Burn severity/Kenow_se
 fire_sev.r <- fasterize(fire_sev, raster=dem.r, field="gridcode")
 names(fire_sev.r) <- "FireSeverity"
 
-#2b. Buffer - trails, soils, veg
+#2b. Buffer - trails, soils, veg----
 #Trails
 trails.r <- raster("rasters/MergedTrails.tif")
 plot(trails.r)
@@ -118,7 +118,7 @@ plot(trails)
 names(trails) <- "trails"
 writeRaster(trails, "rasters/trails.tif", overwrite=TRUE)
 
-#Soil - NOT SURE WHAT TO DO WITH THIS####
+#Soil
 soil <- read_sf(paste0(gis, "Projects/WLNP/Soils_separate_fields/Waterton_Lakes_NP_Soils_1976_Dec_13_2017.shp")) %>% 
   mutate(PARENT_MAT=as.factor(PARENT_MAT))
 soil.r <- fasterize(soil, raster=dem.r, field="PARENT_MAT")
