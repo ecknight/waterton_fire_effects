@@ -48,6 +48,8 @@ dat.cov <- dat %>%
                 !is.na(sand.300),
                 !is.na(cover.300))
 
+write.csv(dat.cov, "SurveyDataWithOffsets&Covariates.csv", row.names = FALSE)
+
 #3. Format for occupancy----
 lambda <- read.csv("LambdaEstimates.csv")
 
