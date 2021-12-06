@@ -12,7 +12,9 @@ options(scipen=99999)
 dat <- read.csv("SurveyDataWithOffsets&Covariates.csv") %>% 
   mutate(Kenow = ifelse(FireHistory==2017, "impact", "control"),
          Kenow = ifelse(is.na(Kenow), "control", Kenow),
-         date = date(DateTime))
+         date = date(DateTime),
+         doy = yday(DateTime)) %>% 
+  dplyr::filter(doy < 225)
 
 dat.wgs <- dat %>% 
   st_as_sf(coords=c("X", "Y"), crs=26912) %>% 
@@ -21,7 +23,7 @@ dat.wgs <- dat %>%
   data.frame() %>% 
   rename(lon=X, lat=Y) %>% 
   cbind(dat) %>% 
-  dplyr::select(date, lat, lon)
+  dplyr::select(date, lat, lon) 
 
 dat.sun <- getSunlightTimes(data=dat.wgs, keep="sunset") %>% 
   dplyr::select(sunset)
@@ -29,11 +31,9 @@ head(dat.sun)
 
 dat.human <- dat %>% 
   cbind(dat.sun) %>% 
-  dplyr::filter(survey=="human") %>% 
+#  dplyr::filter(survey=="human") %>% s
   mutate(DateTime = ymd_hms(DateTime), 
-         doy = yday(DateTime),
-         suntime = as.numeric(DateTime - sunset + 6)) %>% 
-  dplyr::filter(doy < 210)
+         suntime = as.numeric(DateTime - sunset + 6))
 
 hist(dat.human$suntime)
 hist(dat.human$doy)
