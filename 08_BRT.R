@@ -10,11 +10,14 @@ library(dismo)
 dat <- read.csv("SurveyDataWithOffsets.csv")  %>% 
   mutate(ID=paste0(survey,"-",station,"-",year),
          boom=ifelse(detection==2, 1, 0),
-         call=ifelse(detection>0, 1, 0)) %>% 
+         call=ifelse(detection>0, 1, 0),
+         DateTime = ymd_hms(DateTime),
+         doy = yday(DateTime)) %>% 
   arrange(ID, DateTime) %>% 
   group_by(ID) %>% 
   mutate(n=row_number()) %>% 
-  ungroup()
+  ungroup() %>% 
+  dplyr::filter(doy < 225)
 
 #2. Add covariates to data----
 cov <- read.csv("SurveyLocationsWithCovs.csv") %>% 
