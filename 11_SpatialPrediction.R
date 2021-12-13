@@ -25,7 +25,7 @@ names(grass.300) <- "grass.300"
 
 #3. Predictions---
 lambda <- read.csv("LambdaEstimates.csv")
-edr <- read.csv("EDR.csv")[1,1]
+edr <- read.csv("EDR.csv")[1,]$eda
 
 pred <- sand.300 %>% 
   as.data.frame(xy=TRUE) %>% 
