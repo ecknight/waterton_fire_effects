@@ -1,5 +1,5 @@
-#title: Planning for 2021 ARU deployment to fill sampling gaps for CONI
-#author: Elly C. Knight, adapted from Peter Solymos
+#title: Wrangling recognizer data for coni density estimation
+#author: Elly C. Knight
 #created: October 31, 2021
 
 library(mefa4)
@@ -9,8 +9,6 @@ library(tidyverse)
 library(readr)
 library(fs)
 library(lubridate)
-
-#This step uses just the new recognizer data to calculate availability offsets for date and time
 
 #1. Read in data & wrangle----
 files <- fs::dir_ls("/Users/ellyknight/Documents/Employment/Contracts/WatertonCONIMonitoring/Processing/Results/Validated/", glob = "*validated*.txt")
