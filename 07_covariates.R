@@ -20,7 +20,11 @@ dat <- read.csv("SurveyDataWithOffsets.csv") %>%
   summarize(detection=max(detection)) %>% 
   ungroup()
 
-#ARU surveys
+#Number of stations
+table(dat$year, dat$survey)
+table(dat$survey)
+
+#Location data
 locs.2020 <- read.csv("CommonNightawkSamplingLocationsExisting.csv") %>% 
   rename(Latitude=Y, Longitude=X) %>% 
   group_by(Site) %>% 
@@ -43,10 +47,11 @@ locs.aru <- rbind(locs.2020, locs.2021, locs.wt) %>%
          Latitude = round(as.numeric(Latitude), digits=5)) %>% 
   unique()
 
-dat.sf <- dat %>% 
+#Put together
+dat.locs <- dat %>% 
   mutate(station = gsub(pattern="-00", replacement="-", x=station),
-         station = gsub(pattern="-0", replacement="-", x=station)) %>% 
-  mutate(station = gsub(pattern="CONI-GAP", replacement="GAP", x=station),
+         station = gsub(pattern="-0", replacement="-", x=station),
+         station = gsub(pattern="CONI-GAP", replacement="GAP", x=station),
          station = gsub(pattern="Cardston Gate 0", replacement = "CAR-", x=station),
          station = gsub(pattern="Cardson Entrance 0", replacement = "ENT-", x=station),
          station = gsub(pattern="Eskerine 0", replacement = "ESK-", x=station),
@@ -64,7 +69,7 @@ dat.sf <- dat %>%
          station = gsub(pattern="Highway 6 South 03", replacement="HWY6-3", x=station),
          station = gsub(pattern="Highway 6 North 02", replacement="HWY6-2", x=station),
          station = gsub(pattern="Highway 6 North 05", replacement="HWY6-5", x=station)) %>% 
- inner_join(locs.aru %>% 
+ left_join(locs.aru %>% 
               mutate(station = gsub(pattern="CONI-GAP", replacement="GAP", x=station),
                      station = gsub(pattern="Cardston Gate 0", replacement = "CAR-", x=station),
                      station = gsub(pattern="Cardson Entrance 0", replacement = "ENT-", x=station),
@@ -82,11 +87,25 @@ dat.sf <- dat %>%
                      station = gsub(pattern="Highway 6 North 11", replacement="HWY6-11", x=station),
                      station = gsub(pattern="Highway 6 South 03", replacement="HWY6-3", x=station),
                      station = gsub(pattern="Highway 6 North 02", replacement="HWY6-2", x=station),
-                     station = gsub(pattern="Highway 6 North 05", replacement="HWY6-5", x=station))) %>% 
+                     station = gsub(pattern="Highway 6 North 05", replacement="HWY6-5", x=station)))
+
+table(dat.locs$survey)
+
+#Find NAs
+dat.na <- dat.locs %>% 
+  dplyr::filter(is.na(Longitude))
+
+#6 stations that I can't find utms for
+
+#Create spatial object
+dat.sf <- dat.locs %>% 
+  dplyr::filter(!station %in% dat.na$station) %>% 
   st_as_sf(coords=c("Longitude", "Latitude"), crs=4326) %>% 
   st_transform(crs=26912) %>% 
-  dplyr::select(station, geometry) %>% 
+  dplyr::select(survey, station, geometry) %>% 
   unique()
+
+table(dat.sf$survey)
 
 #2. Read data and prepare----
 gis <- "/Volumes/SSD/GIS/"
@@ -225,17 +244,29 @@ names(develop) <- "develop"
 writeRaster(develop, "rasters/develop.tif", overwrite=TRUE)
 
 #Veg cover
-canopy.r <- fasterize(veg, raster=dem.r, field="DENS_MOD")
+canopy <- veg %>% 
+  dplyr::mutate(cover = case_when(DENS_MOD=="1 - Closed Canopy/Continuous (60-100% coverage)" ~ 3,
+                                  DENS_MOD=="2 - Open Canopy/Discontinuous (25-60% coverage)" ~ 2,
+                                  DENS_MOD=="3 - Dispersed/Sparse Canopy (10-25% coverage)" ~ 1))
+summary(canopy$cover)
+canopy.r <- fasterize(canopy, raster=dem.r, field="cover")
 names(canopy.r) <- "VegetationCover"
 writeRaster(canopy.r, "rasters/cover.tif", overwrite=TRUE)
 
 #Veg height
-height.r <- fasterize(veg, raster=dem.r, field="HT_MOD")
+height <- veg %>% 
+  dplyr::mutate(height = case_when(HT_MOD=="1 - 30-50 meters (98-162 ft)" ~ 6,
+                                   HT_MOD=="2 - 15-30 meters (50-98 feet)" ~ 5,
+                                   HT_MOD=="3 - 5-15 meters (16-50 feet)" ~ 4,
+                                   HT_MOD=="4 - 0.5-5 meters (1.5-16 feet)" ~ 3,
+                                   HT_MOD=="5 - <2 meters" ~ 2,
+                                   HT_MOD=="6 - 0.5 meters (< 1.5 feet)" ~ 1))
+height.r <- fasterize(height, raster=dem.r, field="height")
 names(height.r) <- "VegetationHeight"
 writeRaster(height.r, "rasters/height.tif", overwrite=TRUE)
 
-files <- list.files(path="rasters/", pattern="*.tif")
-files <- "sand.tif"
+#files <- list.files(path="rasters/", pattern="*.tif")
+files <- c("cover.tif", "develop.tif", "grass.tif", "height.tif", "pine.tif", "sand.tif", "trails.tif", "water.tif", "wet.tif", "wetland.tif")
 radii <- c(300)
 loop <- expand.grid(files=files, radius=radii)
 
@@ -247,7 +278,7 @@ for(i in 1:nrow(loop)){
     layer.focal <- focal(layer.i, focalWeight(layer.i, d=radius.i, type='circle'), na.rm=TRUE)
   }
   else{
-    layer.focal <- focal(layer.i, focalWeight(layer.i, d=radius.i, type='circle'))
+    layer.focal <- focal(layer.i, focalWeight(layer.i, d=radius.i, type='circle'), na.rm=TRUE)
   }
   names(layer.focal) <- paste0(name.i,"-",radius.i)
   writeRaster(layer.focal, paste0("rasters/",name.i,"-",radius.i,".tif"), overwrite=TRUE)
@@ -272,17 +303,20 @@ coords <- dat.sf %>%
   st_coordinates()
 covs <- data.frame(raster::extract(layers, coords[,c("X", "Y")]))
 
-dat.covs <- dat.sf %>% 
+covs.sf <- dat.sf %>% 
   st_coordinates() %>% 
   cbind(data.frame(dat.sf)) %>% 
   dplyr::select(-geometry) %>% 
   cbind(covs)
 
-write.csv(dat.covs, "SurveyLocationsWithCovs.csv", row.names=FALSE)
+table(covs.sf$survey)
+
+write.csv(covs.sf, "SurveyLocationsWithCovs.csv", row.names=FALSE)
 
 #4. VIF----
 covs.vif <- dat.covs %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, sand.300, water.300, wet.300, wetland.300)
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, sand.300, water.300, wet.300, wetland.300) %>% 
+  unique()
 M <- cor(covs.vif, use="complete.obs")
 M
 corrplot(M)
@@ -306,3 +340,44 @@ M
 corrplot(M)
 
 vif(covs.vif)
+
+#5. Join back to data----
+dat <- read.csv("SurveyDataWithOffsets.csv")
+
+dat.covs <- dat %>% 
+  mutate(station = gsub(pattern="-00", replacement="-", x=station),
+         station = gsub(pattern="-0", replacement="-", x=station),
+         station = gsub(pattern="CONI-GAP", replacement="GAP", x=station),
+         station = gsub(pattern="Cardston Gate 0", replacement = "CAR-", x=station),
+         station = gsub(pattern="Cardson Entrance 0", replacement = "ENT-", x=station),
+         station = gsub(pattern="Eskerine 0", replacement = "ESK-", x=station),
+         station = gsub(pattern="HORSESHOE-", replacement = "HORSE-", x=station),
+         station = gsub(pattern="LAKEVIEW-", replacement = "LAKE-", x=station),
+         station = gsub(pattern="OILBASIN", replacement = "OIL", x=station),
+         station = gsub(pattern="Red Rock Parkway ", replacement = "RRP-", x=station),
+         station = gsub(pattern="Belly River 0", replacement = "BEL-", x=station),
+         station = gsub(pattern="Pincher Entrance Transect 0", replacement = "PIN-", x=station),
+         station = gsub(pattern="-00", replacement="-", x=station),
+         station = gsub(pattern="-0", replacement="-", x=station),
+         station = gsub(pattern="Highway 6 North 08", replacement="HWY6-8", x=station),
+         station = gsub(pattern="Highway 6 North 10", replacement="HWY6-10", x=station),
+         station = gsub(pattern="Highway 6 North 11", replacement="HWY6-11", x=station),
+         station = gsub(pattern="Highway 6 South 03", replacement="HWY6-3", x=station),
+         station = gsub(pattern="Highway 6 North 02", replacement="HWY6-2", x=station),
+         station = gsub(pattern="Highway 6 North 05", replacement="HWY6-5", x=station)) %>% 
+  dplyr::filter(!station %in% dat.na$station) %>% 
+  left_join(covs.sf) %>% 
+  mutate(FireTime=year-FireHistory,
+         FireTime=ifelse(FireTime < 0, NA, FireTime),
+         FireTime=ifelse(is.na(FireTime), 200, FireTime),
+         FireSeverity = ifelse(year > 2017, FireSeverity, NA)) %>% 
+  dplyr::filter(!is.na(pine.300))
+
+dat.covs.st <- dat.covs %>% 
+  dplyr::select(station, survey) %>% 
+  unique()
+
+table(dat.covs.st$survey)
+#3 less ARU stations that were outside landcover footprint
+
+write.csv(dat.covs, "SurveyDataWithCovs.csv", row.names = FALSE)
