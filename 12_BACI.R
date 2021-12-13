@@ -31,7 +31,7 @@ head(dat.sun)
 
 dat.human <- dat %>% 
   cbind(dat.sun) %>% 
-#  dplyr::filter(survey=="human") %>% s
+  dplyr::filter(survey=="human") %>% 
   mutate(DateTime = ymd_hms(DateTime), 
          suntime = as.numeric(DateTime - sunset + 6))
 
