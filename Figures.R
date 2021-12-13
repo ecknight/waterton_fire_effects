@@ -5,6 +5,7 @@ library(raster)
 library(ggmap)
 library(ggspatial)
 library(patchwork)
+library(gridExtra)
 
 my.theme <- theme_classic() +
   theme(text=element_text(size=12, family="Arial"),
@@ -19,7 +20,7 @@ my.theme <- theme_classic() +
         plot.title=element_text(size=12, hjust = 0.5))
 
 
-#1. Study area----
+#FIGURE 1. STUDY AREA----
 dat <- read.csv("SurveyDataWithOffsets&Covariates.csv") %>% 
   mutate(Kenow = ifelse(FireHistory==2017, "impact", "control"),
          Kenow = ifelse(is.na(Kenow), "control", Kenow)) %>% 
@@ -173,6 +174,70 @@ plot.sa <- map.site +
 
 ggsave(plot.sa, filename="Figs/StudyArea.jpeg", device="jpeg", width=9, height=6, units="in", dpi=600)
 
+#FIGURE 4. OFFSETS-----
+pr <- read.csv("OffsetPredictionsForFigure.csv") %>%
+  mutate(Date=as.Date(jday*365, origin="2015-01-01"))
+
+pr.boom <- pr %>% 
+  dplyr::filter(!is.na(p.boom))
+
+dat.boom <- read.csv("OffsetDataForFigure_Boom.csv") %>% 
+  mutate(doy = yday(ymd_hms(DateTime)),
+         Date = as.Date(doy, origin="2015-01-01")) %>% 
+  dplyr::filter(doy >= min(pr.boom$doy),
+                doy <= max(pr.boom$doy),
+                tsss >= min(pr.boom$tsss),
+                tsss <= max(pr.boom$tsss))
+
+dat.call <- read.csv("OffsetDataForFigure_Call.csv") %>% 
+  mutate(doy = yday(ymd_hms(DateTime)),
+         Date = as.Date(doy, origin="2015-01-01")) %>% 
+  dplyr::filter(doy >= min(pr$doy),
+                doy <= max(pr$doy),
+                tsss >= min(pr$tsss),
+                tsss <= max(pr$tsss))
+
+dat <- read.csv("SurveyDataWithOffsets.csv") %>% 
+  mutate(doy = yday(ymd_hms(DateTime)),
+         Date = as.Date(doy, origin="2015-01-01")) %>% 
+  dplyr::filter(survey=="ARU")
+
+dat.boom <- dat %>% 
+  dplyr::filter(doy >= min(pr.boom$doy),
+                doy <= max(pr.boom$doy),
+                tsss >= min(pr.boom$tsss),
+                tsss <= max(pr.boom$tsss)) %>% 
+  mutate(detection = ifelse(detection==2, 1, 0))
+
+dat.call <- dat %>% 
+  dplyr::filter(doy >= min(pr$doy),
+                doy <= max(pr$doy),
+                tsss >= min(pr$tsss),
+                tsss <= max(pr$tsss)) %>% 
+  mutate(detection = ifelse(detection %in% c(1,2), 1, 0))
+
+plot.boom.offset <- ggplot() +
+  geom_raster(aes(x=Date, y=tsss, fill=p.boom), data=pr.boom, alpha=0.7) +
+  scale_fill_viridis_c(name="Probability\nof territorial\nactivity", direction=-1) +
+  geom_point(aes(x=Date, y=tsss, colour=factor(detection)), alpha=0.5, data=subset(dat.boom, detection==0)) +
+  geom_point(aes(x=Date, y=tsss, colour=factor(detection)), data=subset(dat.boom, detection==1)) +
+  scale_colour_manual(values=c("grey70", "grey30"), name="Common\nnighthawk\ndetection", labels=c("Absent", "Present")) +
+  ylab("Hours since sunset") +
+  my.theme
+plot.boom.offset
+
+plot.call.offset <- ggplot() +
+  geom_raster(aes(x=Date, y=tsss, fill=p.call), data=pr, alpha=0.7) +
+  scale_fill_viridis_c(name="Probability\nof home range\nactivity", direction=-1) +
+  geom_point(aes(x=Date, y=tsss, colour=factor(detection)), alpha=0.5, data=subset(dat.call, detection==0)) +
+  geom_point(aes(x=Date, y=tsss, colour=factor(detection)), data=subset(dat.call, detection==1)) +
+  scale_colour_manual(values=c("grey70", "grey30"), name="Common\nnighthawk\ndetection", labels=c("Absent", "Present")) +
+  ylab("Hours since sunset") +
+  my.theme
+plot.call.offset
+
+ggsave(plot=grid.arrange(plot.boom.offset, plot.call.offset, ncol=2), filename="Figs/Figure4Offsets.jpeg", device="jpeg", width=12, height=5, units="in")
+
 
 ####### SUMMARY STATS FOR THINGS#####
 
@@ -185,3 +250,14 @@ dat <- read.csv("SurveyDataWithOffsets&Covariates.csv") %>%
 table(dat$survey)
 table(dat$survey, dat$year)
 
+#Number of detections
+dat <- read.csv("SurveyDataWithOffsets&Covariates.csv") %>% 
+  group_by(survey, station, year, X, Y) %>% 
+  summarize(booms = sum(boom),
+            calls = sum(call)) %>% 
+  ungroup() %>% 
+  mutate(boom.det = ifelse(booms > 0, 1, 0),
+         call.det = ifelse(calls > 0, 1, 0))
+
+table(dat$survey, dat$boom.det)    
+table(dat$survey, dat$call.det)    
