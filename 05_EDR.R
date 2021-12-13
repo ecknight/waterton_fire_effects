@@ -25,7 +25,8 @@ AIC(md1, md2)
 
 #3. Calculate EDR----
 #' We pick `md1` over `md2` based on AIC
-EDR <- unname(sqrt(1/coef(md1)))
+EDR <- data.frame(edr = unname(sqrt(1/coef(md1)))) %>% 
+  mutate(eda = edr^2*pi*0.0001)
 EDR
 
 write.csv(EDR, "EDR.csv", row.names = FALSE)
