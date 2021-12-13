@@ -246,7 +246,7 @@ plogis(best.boom$coef[4])
 plogis(best.call$coef[3])
 
 #6e. Density----
-edr <- read.csv("EDR.csv")[1,1]
+edr <- read.csv("EDR.csv")[1,]$eda
 
 estimates.boom <- delta.boom %>% 
   cbind(lamvec.boom) %>% 
