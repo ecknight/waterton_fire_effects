@@ -1,4 +1,7 @@
 library(tidyverse)
+library(tidylog)
+
+#Note: This file is from the bioacoustics score manuscript processing
 
 #1. Read in & wrangle data for a score of 60----
 dist <- read.csv("Data/FinalClipListAndRecognizerResults.csv")
@@ -28,8 +31,11 @@ AIC(md1, md2)
 EDR <- data.frame(edr = unname(sqrt(1/coef(md1)))) %>% 
   mutate(eda = edr^2*pi*0.0001)
 EDR
+#       edr      eda
+#1 247.7956 19.29021
 
 write.csv(EDR, "EDR.csv", row.names = FALSE)
 
 #4. Calculate recall----
 sum(dist.all$detection)/nrow(dist.all)
+#0.5626959
