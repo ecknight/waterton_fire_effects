@@ -36,9 +36,13 @@ abu.hum <- dat.hum %>%
   mutate(detection = "call") %>% 
   dplyr::select(survey, station, year, date, detection, abundance)
 
-abu <- rbind(abu.aru, abu.hum) %>% 
+abu <- abu.aru %>% 
   mutate(fire = ifelse(year <= 2017, "before", "after")) %>% 
   mutate(firesurvey = paste0(fire,"-", survey))
+
+#abu <- rbind(abu.aru, abu.hum) %>% 
+#  mutate(fire = ifelse(year <= 2017, "before", "after")) %>% 
+#  mutate(firesurvey = paste0(fire,"-", survey))
 
 abu.boom <- abu %>% 
   dplyr::filter(detection=="boom")
