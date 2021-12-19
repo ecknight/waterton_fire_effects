@@ -314,8 +314,10 @@ table(covs.sf$survey)
 write.csv(covs.sf, "SurveyLocationsWithCovs.csv", row.names=FALSE)
 
 #4. VIF----
-covs.vif <- dat.covs %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, sand.300, water.300, wet.300, wetland.300) %>% 
+covs.sf <- read.csv("SurveyLocationsWithCovs.csv")
+
+covs.vif <- covs.sf %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wet.300, wetland.300) %>% 
   unique()
 M <- cor(covs.vif, use="complete.obs")
 M
@@ -324,8 +326,8 @@ corrplot(M)
 vif(covs.vif)
 #take out wet
 
-covs.vif <- dat.covs %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, trails.300, pine.300, sand.300, water.300, wetland.300)
+covs.vif <- covs.sf %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wetland.300)
 M <- cor(covs.vif, use="complete.obs")
 M
 corrplot(M)
@@ -333,8 +335,8 @@ corrplot(M)
 vif(covs.vif)
 #take out height
 
-covs.vif <- dat.covs %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, trails.300, pine.300, sand.300, water.300, wetland.300)
+covs.vif <- covs.sf %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, pine.300, sand.300, trails.300, water.300, wetland.300)
 M <- cor(covs.vif, use="complete.obs")
 M
 corrplot(M)
