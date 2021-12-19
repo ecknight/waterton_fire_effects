@@ -6,6 +6,7 @@ library(mefa4)
 library(maptools)
 library(survival)
 library(tidyverse)
+library(tidylog)
 library(readr)
 library(fs)
 library(lubridate)
@@ -20,6 +21,7 @@ df.raw <- read.csv("Data/ValidatedRecognizerResults.csv") %>%
   mutate(timeofdetection=as.numeric(str_sub(TimeOffset, 5, 5))*60+as.numeric(str_sub(TimeOffset, 7, 8))) %>%
   rename(path = Filename) %>% 
   mutate(DateTime = as_datetime(DateTime),
+         year = year(DateTime),
          path = gsub("\\", "/", path, fixed=TRUE),
          path = gsub("/Volumes/", "", path, fixed=TRUE)) %>% 
   separate(path, 
@@ -27,7 +29,8 @@ df.raw <- read.csv("Data/ValidatedRecognizerResults.csv") %>%
            sep = "/",
            remove = FALSE) %>% 
   mutate(Date = as.character(Date)) %>% 
-  dplyr::select(Filename, Station, Date, Time, DateTime, TimeOffset, detection, timeofdetection) 
+  dplyr::select(Filename, Station, year, Date, Time, DateTime, TimeOffset, detection, timeofdetection) %>% 
+  dplyr::filter(detection!="0")
 
 #2. Add files with no detections----
 rec <- read.csv("FinalFileList.csv") %>% 
@@ -35,8 +38,7 @@ rec <- read.csv("FinalFileList.csv") %>%
            into = c("Blank", "Volumes", "Drive", "Park","Batch", "Filename"),
            sep = "/",
            remove = FALSE) %>% 
-  dplyr::filter(!is.na(Filename),
-                !Filename %in% df.raw$Filename) %>% 
+  dplyr::filter(!is.na(Filename)) %>% 
   separate(Filename, 
            into = c("Station", "Date", "Time", "Filetype"),
            sep = "[^A-Za-z0-9 \\- :]",
@@ -46,8 +48,13 @@ rec <- read.csv("FinalFileList.csv") %>%
          timeofdetection=NA,
          Date = ymd(Date),
          Time = as.character(Time),
-         DateTime = ymd_hms(paste0(Date, Time))) %>% 
-  dplyr::select(Filename, Station, Date, Time, DateTime, TimeOffset, detection, timeofdetection)
+         DateTime = ymd_hms(paste0(Date, Time)),
+         year = year(DateTime)) %>% 
+  dplyr::select(Filename, Station, year, Date, Time, DateTime, TimeOffset, detection, timeofdetection) %>% 
+  dplyr::filter(!Filename %in% df.raw$Filename,
+                Station!="WLNP-022-1", #remove files for duplicate station ID
+                !Station %in% c("WLNP-023-04", "WLNP-13-3", "WLNP-16-1", "WLNP-8-3", "WLNP-83")) #remove files that don't have 30 recordings
+#Remember: Missing pieces are from folders, not recordings
 
 df <- rbind(df.raw, rec)
 
@@ -75,7 +82,6 @@ df.sun <- getSunlightTimes(data=df.locs, tz="Canada/Mountain", keep="sunset") %>
 ggplot(df.sun) +
   geom_histogram(aes(x=tsss))
 
-  
 #4. ID locations with detections----
 site.boom <- df.sun %>% 
   filter(detection=="B") %>% 
@@ -121,25 +127,29 @@ df.boom <- df.boom.1st %>%
   mutate(doy = yday(DateTime),
          jday = doy/365,
          jday2 = jday^2,
+         start = hour(DateTime) + minute(DateTime)/60,
+         tod = start/24,
          ts = (tsss +2)/8,
-         ts2 = ts^2,
          sin = sin(ts*2*pi),
          cos = cos(ts*2*pi),
          sv = Surv(time/60, detection))
 
 ggplot(df.boom) +
-  geom_point(aes(x=cos, y=sin))
+  geom_point(aes(x=tsss, y=sin))
 
 ggplot(df.boom) +
   geom_point(aes(x=tsss, y=cos))
+
+ggplot(df.boom) +
+  geom_point(aes(x=cos, y=cos + sin))
 
 df.call <- df.call.1st %>% 
   mutate(doy = yday(DateTime),
          jday = doy/365,
          jday2 = jday^2,
          start = hour(DateTime) + minute(DateTime)/60,
+         tod = start/24,
          ts = (tsss +2)/8,
-         ts2 = ts^2,
          sin = sin(ts*2*pi),
          cos = cos(ts*2*pi),
          sv = Surv(time/60, detection))
@@ -162,17 +172,12 @@ mods.boom <- list(
   m3 = survreg(sv ~ sin, df.boom, dist="exponential"),
   m4 = survreg(sv ~ cos, df.boom, dist="exponential"),
   m5 = survreg(sv ~ sin + cos, df.boom, dist="exponential"),
-  m6 = survreg(sv ~ sin*cos, df.boom, dist="exponential"),
-  m7 = survreg(sv ~ jday + sin, df.boom, dist="exponential"),
-  m8 = survreg(sv ~ jday + cos, df.boom, dist="exponential"),
-  m9 = survreg(sv ~ jday + sin + cos, df.boom, dist="exponential"),
-  m10 = survreg(sv ~ jday + sin*cos, df.boom, dist="exponential"),
-  m11 = survreg(sv ~ jday + jday2 + sin, df.boom, dist="exponential"),
-  m12 = survreg(sv ~ jday + jday2 + cos, df.boom, dist="exponential"),
-  m13 = survreg(sv ~ jday + jday2 + sin + cos, df.boom, dist="exponential"),
-  m14 = survreg(sv ~ jday + jday2 + sin*cos, df.boom, dist="exponential")
-)
-
+  m6 = survreg(sv ~ jday + sin, df.boom, dist="exponential"),
+  m7 = survreg(sv ~ jday + cos, df.boom, dist="exponential"),
+  m8 = survreg(sv ~ jday + sin + cos, df.boom, dist="exponential"),
+  m9 = survreg(sv ~ jday + jday2 + sin, df.boom, dist="exponential"),
+  m10 = survreg(sv ~ jday + jday2 + cos, df.boom, dist="exponential"),
+  m11 = survreg(sv ~ jday + jday2 + sin + cos, df.boom, dist="exponential"))
 
 mods.call <- list(
   m0 = survreg(sv ~ 1, df.call, dist="exponential"),
@@ -181,16 +186,13 @@ mods.call <- list(
   m3 = survreg(sv ~ sin, df.call, dist="exponential"),
   m4 = survreg(sv ~ cos, df.call, dist="exponential"),
   m5 = survreg(sv ~ sin + cos, df.call, dist="exponential"),
-  m6 = survreg(sv ~ sin*cos, df.call, dist="exponential"),
-  m7 = survreg(sv ~ jday + sin, df.call, dist="exponential"),
-  m8 = survreg(sv ~ jday + cos, df.call, dist="exponential"),
-  m9 = survreg(sv ~ jday + sin + cos, df.call, dist="exponential"),
-  m10 = survreg(sv ~ jday + sin*cos, df.call, dist="exponential"),
-  m11 = survreg(sv ~ jday + jday2 + sin, df.call, dist="exponential"),
-  m12 = survreg(sv ~ jday + jday2 + cos, df.call, dist="exponential"),
-  m13 = survreg(sv ~ jday + jday2 + sin + cos, df.call, dist="exponential"),
-  m14 = survreg(sv ~ jday + jday2 + sin*cos, df.call, dist="exponential")
-)
+  m6 = survreg(sv ~ jday + sin, df.call, dist="exponential"),
+  m7 = survreg(sv ~ jday + cos, df.call, dist="exponential"),
+  m8 = survreg(sv ~ jday + sin + cos, df.call, dist="exponential"),
+  m9 = survreg(sv ~ jday + jday2 + sin, df.call, dist="exponential"),
+  m10 = survreg(sv ~ jday + jday2 + cos, df.call, dist="exponential"),
+  m11 = survreg(sv ~ jday + jday2 + sin + cos, df.call, dist="exponential"))
+
 
 #10. Compare with AIC----
 aic.boom <- data.frame(df=sapply(mods.boom, function(z) length(coef(z))),
@@ -264,7 +266,6 @@ preds <- full_join(pr.boom, pr.call) %>%
          cos = cos(ts*2*pi))
 
 write.csv(preds, "OffsetPredictionsForFigure.csv", row.names = FALSE)
-
 write.csv(df.boom, "OffsetDataForFigure_Boom.csv", row.names = FALSE)
 write.csv(df.call, "OffsetDataForFigure_Call.csv", row.names = FALSE)
 
@@ -282,7 +283,8 @@ df.aru <- df.sun %>%
          ts2 = ts^2,
          sin = ts*2*pi,
          cos = ts*2*pi,
-         survey="ARU") %>% 
+         survey="ARU",
+         year = year(DateTime)) %>% 
   rename(station=Station)
 df.aru$p.boom <- 1-exp(-(1/predict(mb.boom, newdata = df.aru))*10)
 df.aru$p.call <- 1-exp(-(1/predict(mb.call, newdata = df.aru))*10)
@@ -325,7 +327,7 @@ df.hum <- df.hum.sun %>%
          cos = ts*2*pi,
          survey="human") %>% 
   rename(station=Site, detection=Presence)
-df.hum$p.boom <- 1-exp(-(1/predict(mb.boom, newdata = df.hum))*6)
+df.hum$p.boom <- NA
 df.hum$p.call <- 1-exp(-(1/predict(mb.call, newdata = df.hum))*6)
          
 
@@ -336,7 +338,6 @@ SM2 <- 0.789
 #Recall at score 60 from known distance clips
 rec <-  0.5626959
 
-df.hum$p.boom <- df.hum$p.boom*(1/SM2)*(1/rec)
 df.hum$p.call <- df.hum$p.call*(1/SM2)*(1/rec)
 
 summary(df.hum$p.boom)
@@ -346,10 +347,18 @@ summary(df.hum$p.call)
 df.pred <- rbind(df.aru %>% 
                    dplyr::select(survey, station, DateTime, tsss, detection, p.boom, p.call),
                  df.hum  %>% 
-                   dplyr::select(survey, station, DateTime, tsss, detection, p.boom, p.call)) %>% 
+                   dplyr::select(survey, station, DateTime, tsss, detection, p.boom, p.call)) %>%
   mutate(year=year(DateTime),
          doy=yday(DateTime),
          fire=ifelse(year <=2017, "before", "after")) %>% 
-  dplyr::filter(doy < 225)
+  dplyr::filter(doy < 225) %>% 
+  data.frame() %>% 
+  mutate(p.call = p.call/(max(p.call)))
 
 write.csv(df.pred, "SurveyDataWithOffsets.csv", row.names=FALSE)
+
+#16. Check # of recordings per site----
+df.size <- data.frame(table(df.pred$station, df.pred$year, df.pred$survey)) %>% 
+  rename(station = Var1, year = Var2, survey = Var3) %>% 
+  dplyr::filter(survey=="ARU", !Freq %in% c(0, 30))
+df.size
