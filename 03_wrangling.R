@@ -6,9 +6,12 @@ library(mefa4)
 library(maptools)
 library(survival)
 library(tidyverse)
+library(tidylog)
 library(readr)
 library(fs)
 library(lubridate)
+
+#Note true positives and false positives wrangled separately because true positives were double checked by ECK (i.e., true and false positive data comes from different files)
 
 #1. Read in data & wrangle----
 files <- fs::dir_ls("/Users/ellyknight/Documents/Employment/Contracts/WatertonCONIMonitoring/Processing/Results/Validated/", glob = "*validated*.txt")
@@ -46,3 +49,14 @@ df.1 <- readr::read_tsv("/Users/ellyknight/Documents/Employment/Contracts/Watert
 df <- rbind(df.0, df.1)
 
 write.csv(df, "Data/ValidatedRecognizerResults.csv", row.names=FALSE)
+
+#5. Check # of sites with detections----
+df.site <- df %>% 
+  mutate(boom =ifelse(detection=="B", 1, 0),
+         call = ifelse(detection %in% c("1", "B"), 1, 0)) %>% 
+  group_by(Station) %>% 
+  summarize(occ.boom =ifelse(sum(boom) > 0, 1, 0),
+            occ.call = ifelse(sum(call) > 0, 1, 0)) %>% 
+  ungroup()
+
+table(df.site$occ.boom, df.site$occ.call)
