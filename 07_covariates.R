@@ -10,6 +10,7 @@ library(fasterize)
 library(lubridate)
 library(corrplot)
 library(usdm)
+library(dggridR)
 
 options(scipen=99999)
 
@@ -313,37 +314,7 @@ table(covs.sf$survey)
 
 write.csv(covs.sf, "SurveyLocationsWithCovs.csv", row.names=FALSE)
 
-#4. VIF----
-covs.sf <- read.csv("SurveyLocationsWithCovs.csv")
-
-covs.vif <- covs.sf %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wet.300, wetland.300) %>% 
-  unique()
-M <- cor(covs.vif, use="complete.obs")
-M
-corrplot(M)
-
-vif(covs.vif)
-#take out wet
-
-covs.vif <- covs.sf %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wetland.300)
-M <- cor(covs.vif, use="complete.obs")
-M
-corrplot(M)
-
-vif(covs.vif)
-#take out height
-
-covs.vif <- covs.sf %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, pine.300, sand.300, trails.300, water.300, wetland.300)
-M <- cor(covs.vif, use="complete.obs")
-M
-corrplot(M)
-
-vif(covs.vif)
-
-#5. Join back to data----
+#4. Join back to data----
 dat <- read.csv("SurveyDataWithOffsets.csv")
 
 dat.covs <- dat %>% 
@@ -373,13 +344,112 @@ dat.covs <- dat %>%
          FireTime=ifelse(FireTime < 0, NA, FireTime),
          FireTime=ifelse(is.na(FireTime), 200, FireTime),
          FireSeverity = ifelse(year > 2017, FireSeverity, NA)) %>% 
-  dplyr::filter(!is.na(pine.300))
+  dplyr::filter(!is.na(pine.300),
+                Elevation > 0) %>% 
+  mutate(ID=paste0(survey,"-",station,"-",year),
+         boom=ifelse(detection==2, 1, 0),
+         call=ifelse(detection>0, 1, 0),
+         DateTime = ymd_hms(DateTime),
+         doy = yday(DateTime),
+         FireTimeBin = ifelse(FireTime <=4, "y", "n"))
 
 dat.covs.st <- dat.covs %>% 
   dplyr::select(station, survey) %>% 
   unique()
 
 table(dat.covs.st$survey)
-#3 less ARU stations that were outside landcover footprint
+#3 less ARU stations that were outside landcover footprint, 1 less that was outside DEM
 
-write.csv(dat.covs, "SurveyDataWithCovs.csv", row.names = FALSE)
+#5. Thinning----
+#Spatial separation of points
+dat.dist <- dat.covs %>% 
+  dplyr::select(station, X, Y) %>% 
+  unique() %>% 
+  st_as_sf(coords=c("X", "Y"), crs=26912) %>% 
+  st_distance() %>% 
+  data.frame() %>% 
+  pivot_longer(cols=X1:X268, names_to="station", values_to="distance") %>% 
+  mutate(distance = as.integer(distance)) %>% 
+  dplyr::filter(distance > 0, distance < 1000)
+
+hist(dat.dist$distance)
+#Ok yeah should probably look at spatially thinning
+
+#Set up grid
+grid <- dgconstruct(spacing=0.25, metric=TRUE)
+
+dat.station <- dat.covs %>% 
+  dplyr::select(station, X, Y) %>% 
+  unique() %>% 
+  st_as_sf(coords=c("X", "Y"), crs=26912) %>% 
+  st_transform(crs=4326) %>% 
+  st_coordinates() %>% 
+  data.frame() %>% 
+  rename(Latitude = Y, Longitude = X) %>% 
+  cbind(dat.covs %>% 
+          dplyr::select(station, X, Y) %>% 
+          unique())
+
+dat.grid <- dat.station %>% 
+  mutate(cell = dgGEO_to_SEQNUM(grid, Longitude, Latitude)$seqnum) %>% 
+  arrange(cell) %>% 
+  full_join(dat.covs)
+
+#Thin
+set.seed(1234)
+dat.thin <- dat.grid %>% 
+  dplyr::select(station, cell, year) %>% 
+  unique() %>% 
+  group_by(cell, year) %>% 
+  sample_n(1) %>% 
+  ungroup() %>% 
+  left_join(dat.grid) 
+#pick one survey station per grid cell per year
+
+#Number of sites
+dat.grid %>% 
+  dplyr::select(ID, survey) %>% 
+  unique() %>% 
+  group_by(survey) %>% 
+  summarize(n = n())
+
+dat.thin %>% 
+  dplyr::select(ID, survey) %>% 
+  unique() %>% 
+  group_by(survey) %>% 
+  summarize(n = n())
+
+#could thin more and bootstrap
+
+write.csv(dat.thin, "SurveyDataWithCovs.csv", row.names = FALSE)
+
+#6. VIF----
+covs.vif <- read.csv("SurveyDataWithCovs.csv") %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wet.300, wetland.300, FireTime) %>% 
+  unique()
+M <- cor(covs.vif, use="complete.obs")
+M
+corrplot(M)
+
+vif(covs.vif)
+#take out wet
+
+covs.vif <- read.csv("SurveyDataWithCovs.csv") %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wetland.300, FireTime) %>% 
+  unique()
+M <- cor(covs.vif, use="complete.obs")
+M
+corrplot(M)
+
+vif(covs.vif)
+#take out height
+
+covs.vif <- read.csv("SurveyDataWithCovs.csv") %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, pine.300, sand.300, trails.300, water.300, wetland.300, FireTime) %>% 
+  unique()
+
+M <- cor(covs.vif, use="complete.obs")
+M
+corrplot(M)
+
+vif(covs.vif)
