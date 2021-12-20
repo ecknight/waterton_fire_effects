@@ -9,7 +9,7 @@ library(sf)
 options(scipen=99999)
 
 #1. Wrangling----
-dat <- read.csv("SurveyDataWithOffsets&Covariates.csv") %>% 
+dat <- read.csv("SurveyDataWithCovs.csv") %>% 
   mutate(Kenow = ifelse(FireHistory==2017, "impact", "control"),
          Kenow = ifelse(is.na(Kenow), "control", Kenow),
          date = date(DateTime),
