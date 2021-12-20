@@ -4,41 +4,32 @@ library(spatialEco)
 library(sf)
 library(gridExtra)
 
-best.boom <- readRDS("OccupancyModel_Boom.rds")
-best.call <- readRDS("OccupancyModel_Call.rds")
-
-#1. Predictions for new variable combos----
-newdat.boom <- data.frame(expand_grid(grass.300=seq(0, 1, 0.01),
-                                 sand.300 = seq(0, 1, 0.01)))
-Xnewdat.boom <- model.matrix(~grass.300 + sand.300, newdat.boom)
-newdat.boom$delta <- plogis(drop(Xnewdat.boom %*% best.boom$coef[1:3]))
-
-newdat.call <- data.frame(expand_grid(grass.300=seq(0, 1, 0.01)))
-Xnewdat.call <- model.matrix(~grass.300, newdat.call)
-newdat.call$delta <- plogis(drop(Xnewdat.call %*% best.call$coef[1:2]))
+#1. Read in model predictions----
+newdat <- read.csv("OccupancyModelPredictions.csv")
 
 #2. Read in spatial data----
-sand.300 <- raster("rasters/sand-300.tif")
-names(sand.300) <- "sand.300"
-grass.300 <- raster("rasters/grass-300.tif")
-names(grass.300) <- "grass.300"
+grass.300 <- raster("rasters/grass-300.tif") %>% 
+  aggregate(3)
+names(grass.300) <- "grass"
+elevation <- raster("rasters/DEM_10m.tif") %>% 
+  aggregate(3)
+names(elevation) <- "elevation"
 
 #3. Predictions---
 lambda <- read.csv("LambdaEstimates.csv")
 edr <- read.csv("EDR.csv")[1,]$eda
 
-pred <- sand.300 %>% 
+pred <- grass.300 %>% 
   as.data.frame(xy=TRUE) %>% 
-  cbind(grass.300 %>% 
+  cbind(elevation %>% 
           as.data.frame(xy=TRUE) %>% 
-          dplyr::select(grass.300)) %>% 
-  dplyr::filter(!is.na(grass.300)) %>% 
-  mutate(grass.300 = round(grass.300, 2),
-         sand.300 = round(sand.300, 2)) %>% 
-  left_join(newdat.boom) %>% 
-  rename(delta.boom = delta) %>% 
-  left_join(newdat.call) %>% 
-  rename(delta.call = delta) %>% 
+          dplyr::select(elevation)) %>% 
+  dplyr::filter(!is.na(grass),
+                !is.na(elevation),
+                elevation > 0) %>% 
+  mutate(grass = round(grass, 2),
+         elevation = round(elevation)) %>% 
+  left_join(newdat) %>% 
   mutate(lambda.boom = lambda$lambda[1],
          lambda.call = lambda$lambda[2],
          densityha.boom = delta.boom*lambda.boom/edr,
