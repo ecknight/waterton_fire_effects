@@ -238,6 +238,68 @@ plot.call.offset
 
 ggsave(plot=grid.arrange(plot.boom.offset, plot.call.offset, ncol=2), filename="Figs/Figure4Offsets.jpeg", device="jpeg", width=12, height=5, units="in")
 
+#FIGURE 5. COVARIATE EFFECTS####
+newdat <- read.csv("OccupancyModelPredictions.csv")
+
+newdat.grass <- newdat %>% 
+  dplyr::filter(elevation==1540)
+
+newdat.elev <- newdat %>% 
+  dplyr::filter(grass==0.5)
+
+plot.boom.grass <- ggplot(newdat.grass) +
+  geom_line(aes(x=grass, y=delta.boom)) +
+  xlab("Proportion of grassland in 300 m") +
+  ylab("Territorial habitat suitability") +
+  my.theme
+
+plot.call.grass <- ggplot(newdat.grass) +
+  geom_line(aes(x=grass, y=delta.call)) +
+  xlab("Proportion of grassland in 300 m") +
+  ylab("Home range habitat suitability") +
+  my.theme
+
+plot.call.elev <- ggplot(newdat.elev) +
+  geom_line(aes(x=elevation, y=delta.call)) +
+  xlab("Elevation") +
+  ylab("Home range habitat suitability") +
+  my.theme
+
+ggsave(grid.arrange(plot.boom.grass, plot.call.grass, plot.call.elev, ncol=3), 
+       file = "Figs/CovariatePredictions.jpeg", width = 16, height = 7, device="jpeg")
+
+#FIGURE 6. SPATIAL PREDICTIONS####
+pred <- read.csv("SpatialPredictions.csv")
+
+plot.density.boom <- ggplot(pred) +
+  geom_raster(aes(x = x, y = y, fill=densityha.boom), na.rm=TRUE) +
+  scale_fill_viridis_c(name="Territorial males\nper ha") +
+  xlab("") +
+  ylab("") +
+  my.theme +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
+plot.density.call <- ggplot(pred) +
+  geom_raster(aes(x = x, y = y, fill=densityha.call), na.rm=TRUE) +
+  scale_fill_viridis_c(name="Total males\nper ha") + 
+  xlab("") +
+  ylab("") +
+  my.theme +
+  theme(axis.line.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.line.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank())
+
+ggsave(grid.arrange(plot.density.boom, plot.density.call, ncol = 2), 
+       file = "Figs/SpatialPredictions.jpeg", width = 16, height = 7, device="jpeg")
+
 
 ####### SUMMARY STATS FOR THINGS#####
 
@@ -251,7 +313,7 @@ table(dat$survey)
 table(dat$survey, dat$year)
 
 #Number of detections
-dat <- read.csv("SurveyDataWithOffsets&Covariates.csv") %>% 
+dat <- read.csv("SurveyDataWithCovs.csv")
   group_by(survey, station, year, X, Y) %>% 
   summarize(booms = sum(boom),
             calls = sum(call)) %>% 
