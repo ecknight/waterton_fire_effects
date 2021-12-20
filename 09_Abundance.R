@@ -87,22 +87,13 @@ cl0p.boom <- cl0p
 Y1 <- abu.call$abundance
 X0 <- data.matrix(rep(1, length(Y1)))
 Z0 <- X0
-X1 <- model.matrix(~ fire, abu.call)
-X2 <- model.matrix(~ survey, abu.call)
-X3 <- model.matrix(~ firesurvey, abu.call)
 
 cl0p <- zi.fit(Y1, X0, Z0, distr="pois", type="CL", hessian=TRUE)$CL
-cl1p <- zi.fit(Y1, X1, Z0, distr="pois", type="CL", hessian=TRUE)$CL
-cl2p <- zi.fit(Y1, X2, Z0, distr="pois", type="CL", hessian=TRUE)$CL
-cl3p <- zi.fit(Y1, X3, Z0, distr="pois", type="CL", hessian=TRUE)$CL
 cl0nb <- zi.fit(Y1, X0, Z0, distr="negbin", type="CL", hessian=TRUE)$CL
-cl1nb <- zi.fit(Y1, X1, Z0, distr="negbin", type="CL", hessian=TRUE)$CL
-cl2nb <- zi.fit(Y1, X2, Z0, distr="negbin", type="CL", hessian=TRUE)$CL
-cl3nb <- zi.fit(Y1, X3, Z0, distr="negbin", type="CL", hessian=TRUE)$CL
 
-ic <- AIC(cl0p, cl1p, cl2p, cl3p, cl0nb, cl1nb, cl2nb, cl3nb)
-ic$loglik <- c(logLik(cl0p), logLik(cl1p), logLik(cl2p), logLik(cl3p), logLik(cl0nb), logLik(cl1nb), logLik(cl2nb), logLik(cl3nb))
-ic$BIC <- AIC(cl0p, cl1p, cl2p, cl3p, cl0nb, cl1nb, cl2nb, cl3nb, k=log(length(Y1)))$AIC
+ic <- AIC(cl0p, cl0nb)
+ic$loglik <- c(logLik(cl0p), logLik(cl0nb))
+ic$BIC <- AIC(cl0p,cl0nb, k=log(length(Y1)))$AIC
 ic$AICc <- ic$AIC + (2*ic$df^2+2*ic$df) / (length(Y1)-ic$df-1)
 ic <- ic[order(ic$AICc),] %>% 
   mutate(delta = AICc - head(AICc, 1),
