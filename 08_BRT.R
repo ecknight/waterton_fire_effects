@@ -7,48 +7,56 @@ library(tidylog)
 library(lubridate)
 library(dismo)
 
+#idea: only use ARU data and summarize at station level
+
 #1. Wrangle----
 dat <- read.csv("SurveyDataWithCovs.csv") %>% 
   mutate(ID=paste0(survey,"-",station,"-",year),
          boom=ifelse(detection==2, 1, 0),
          call=ifelse(detection>0, 1, 0),
          DateTime = ymd_hms(DateTime),
-         doy = yday(DateTime))
-
-dat.boom.gbm <- dat %>% 
+         doy = yday(DateTime)) %>% 
   dplyr::filter(survey=="ARU") %>% 
-  dplyr::select(boom, p.boom, call, p.call, Elevation, cover.300, develop.300, grass.300,  pine.300, sand.300, trails.300, water.300, wetland.300) %>% 
-  data.frame()
-
-dat.call.gbm <- dat %>% 
-  dplyr::select(boom, p.boom, call, p.call, Elevation, cover.300, develop.300, grass.300,  pine.300, sand.300, trails.300, water.300, wetland.300) %>% 
-  data.frame()
+  group_by(ID, Elevation, cover.300, develop.300, grass.300, pine.300, water.300, wetland.300) %>% 
+  summarize(boom = ifelse(sum(boom) > 0, 1, 0),
+            call= ifelse(sum(call) > 0, 1, 0),
+            p.boom = mean(p.boom),
+            p.call = mean(p.call)) %>% 
+  ungroup() %>% 
+  dplyr::select(boom, p.boom, call, p.call, Elevation, cover.300, develop.300, grass.300,  pine.300, water.300, wetland.300) %>% 
+  data.frame() %>% 
+  dplyr::filter(Elevation > 0)
 
 #3. Model boom----
 set.seed(1234)
-boom.gbm <- dismo::gbm.step(data=dat.boom.gbm, 
-                     gbm.x=5:13,
+boom.gbm <- dismo::gbm.step(data=dat, 
+                     gbm.x=5:11,
                      gbm.y=1,
-                     offset=dat.boom.gbm$p.boom,
+                     offset=dat$p.boom,
                      family="bernoulli",
                      tree.complexity = 3,
-                     learning.rate = 0.005,
+                     learning.rate = 0.001,
                      bag.fraction = 0.75,
                      max.trees=10000) 
 
+gbm.plot(boom.gbm)
+
 boom.int <- gbm.interactions(boom.gbm)
+
 
 #4. Model call----
 set.seed(1234)
-call.gbm <- dismo::gbm.step(data=dat.call.gbm, 
-                            gbm.x=5:13,
+call.gbm <- dismo::gbm.step(data=dat, 
+                            gbm.x=5:11,
                             gbm.y=3,
-                            offset=dat.call.gbm$p.call,
+                            offset=dat$p.call,
                             family="bernoulli",
                             tree.complexity = 3,
-                            learning.rate = 0.005,
+                            learning.rate = 0.001,
                             bag.fraction = 0.75,
                             max.trees=10000) 
+
+gbm.plot(call.gbm)
 
 call.int <- gbm.interactions(call.gbm)
 
@@ -57,7 +65,7 @@ summary <- data.frame(summary(boom.gbm)) %>%
   mutate(response="boom") %>% 
   rbind(data.frame(summary(call.gbm)) %>% 
           mutate(response="call"))
-summary
+View(summary)
 
 write.csv(summary, "BRTCovariateResults.csv", row.names = FALSE)
 
