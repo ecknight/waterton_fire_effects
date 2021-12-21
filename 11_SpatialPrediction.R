@@ -34,7 +34,7 @@ pred <- grass.300 %>%
          lambda.call = lambda$lambda[2],
          densityha.boom = delta.boom*lambda.boom/edr,
          densityha.call = delta.call*lambda.call/edr,
-         cellsize = 100,
+         cellsize = 900,
          densitycell.boom = densityha.boom*cellsize/10000,
          densitycell.call = densityha.call*cellsize/10000)
   
