@@ -303,14 +303,26 @@ ggsave(grid.arrange(plot.density.boom, plot.density.call, ncol = 2),
 
 ####### SUMMARY STATS FOR THINGS#####
 
-#Number of survey stations for each type
-dat <- read.csv("SurveyDataWithOffsets&Covariates.csv") %>% 
+#Number of surveys for each type
+dat <- read.csv("SurveyDataWithCovs.csv") %>% 
   mutate(Kenow = ifelse(FireHistory==2017, "impact", "control"),
          Kenow = ifelse(is.na(Kenow), "control", Kenow)) %>% 
   dplyr::select(survey, station, year, X, Y) %>% 
   unique()
 table(dat$survey)
 table(dat$survey, dat$year)
+
+#number of survey stations & years
+dat.st <- dat %>% 
+  dplyr::select(station, year, survey) %>% 
+  unique() %>% 
+  group_by(station, survey) %>% 
+  summarize(n=n()) %>% 
+  ungroup()
+
+table(dat.st$survey)
+table(dat.st$survey, dat.st$n)
+  
 
 #Number of detections
 dat <- read.csv("SurveyDataWithCovs.csv")
