@@ -36,7 +36,8 @@ dat <- dat.raw %>%
          cover.s = scale(cover.300),
          sand.s = scale(sand.300),
          wetland.s = scale(wetland.300),
-         firetime.s = scale(FireTime))
+         firetime.s = scale(FireTime),
+         evi.s = scale(evi))
 
 #4. Visualize----
 ggplot(dat, aes(x=grass.300, y=boom)) +
@@ -69,6 +70,11 @@ ggplot(dat, aes(x=FireTime, y=boom)) +
 ggplot(dat, aes(x=FireTime, y=call)) +
   geom_smooth()
 
+ggplot(dat, aes(x=evi, y=boom)) +
+  geom_smooth()
+ggplot(dat, aes(x=evi, y=call)) +
+  geom_smooth()
+
 
 #4. Format for occupancy----
 lambda <- read.csv("LambdaEstimates.csv")
@@ -78,7 +84,7 @@ dat.boom <- dat %>%
   dplyr::filter(survey=="ARU")
 
 station.boom <- dat.boom %>% 
-  dplyr::select(station, year, fire, ID, X, Y, firetime.s, grass.s, elevation.s) %>% 
+  dplyr::select(station, year, fire, ID, X, Y, firetime.s, grass.s, elevation.s, wetland.s, evi.s) %>% 
   unique()
 
 y.boom <- dat.boom %>% 
@@ -104,7 +110,7 @@ lamvec.boom <- rep(lambda$lambda[1], nrow(station.boom))
 dat.call <- dat
 
 station.call <- dat.call %>% 
-  dplyr::select(station, year, fire, ID, X, Y, firetime.s, grass.s, elevation.s) %>% 
+  dplyr::select(station, year, fire, ID, X, Y, firetime.s, grass.s, elevation.s, wetland.s) %>% 
   unique()
 
 y.call <- dat.call %>% 
@@ -156,6 +162,10 @@ Xveg4.boom <- model.matrix(~grass.s + elevation.s, station.boom)
 Xveg5.boom <- model.matrix(~grass.s, station.boom)
 Xveg6.boom <- model.matrix(~firetime.s, station.boom)
 Xveg7.boom <- model.matrix(~elevation.s, station.boom)
+Xveg8.boom <- model.matrix(~wetland.s, station.boom)
+Xveg9.boom <- model.matrix(~wetland.s + grass.s, station.boom)
+Xveg10.boom <- model.matrix(~wetland.s*grass.s, station.boom)
+Xveg11.boom <- model.matrix(~wetland.s*grass.s + elevation.s, station.boom)
 
 X.call <- matrix(1, M.call, 1)
 Xveg1.call <- model.matrix(~grass.s + elevation.s + firetime.s, station.call)
@@ -181,6 +191,10 @@ mod.veg4.boom <- mvocc(y.boom, Xveg4.boom, Z.boom, p.boom, lamvec.boom, method=m
 mod.veg5.boom <- mvocc(y.boom, Xveg5.boom, Z.boom, p.boom, lamvec.boom, method=method)
 mod.veg6.boom <- mvocc(y.boom, Xveg6.boom, Z.boom, p.boom, lamvec.boom, method=method)
 mod.veg7.boom <- mvocc(y.boom, Xveg7.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg8.boom <- mvocc(y.boom, Xveg8.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg9.boom <- mvocc(y.boom, Xveg9.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg10.boom <- mvocc(y.boom, Xveg10.boom, Z.boom, p.boom, lamvec.boom, method=method)
+mod.veg11.boom <- mvocc(y.boom, Xveg11.boom, Z.boom, p.boom, lamvec.boom, method=method)
 
 set.seed(1234)
 mod.null.call <- mvocc(y.call, X.call, Z.call, p.call, lamvec.call, method=method)
@@ -193,7 +207,7 @@ mod.veg6.call <- mvocc(y.call, Xveg6.call, Z.call, p.call, lamvec.call, method=m
 mod.veg7.call <- mvocc(y.call, Xveg7.call, Z.call, p.call, lamvec.call, method=method)
 
 #8. Pick best model----
-mods.boom <- list(mod.null.boom, mod.veg1.boom, mod.veg2.boom, mod.veg3.boom, mod.veg4.boom, mod.veg5.boom, mod.veg6.boom, mod.veg7.boom)
+mods.boom <- list(mod.null.boom, mod.veg1.boom, mod.veg2.boom, mod.veg3.boom, mod.veg4.boom, mod.veg5.boom, mod.veg6.boom, mod.veg7.boom, mod.veg8.boom, mod.veg9.boom, mod.veg10.boom, mod.veg11.boom)
 
 aic.boom <- data.frame(df=sapply(mods.boom, function(z) length(coef(z))),
                        AIC=sapply(mods.boom, AIC),
@@ -206,7 +220,7 @@ aic.boom <- data.frame(df=sapply(mods.boom, function(z) length(coef(z))),
   dplyr::select(df, loglik, AICc, delta, weight) %>% 
   mutate(response = "boom")
 aic.boom$model <- row.names(aic.boom)
-aic.boom$model <- c("mod.null.boom", "mod.veg1.boom", "mod.veg2.boom", "mod.veg3.boom", "mod.veg4.boom", "mod.veg5.boom", "mod.veg6.boom", "mod.veg7.boom")
+aic.boom$model <- c("null", "grass+elevation+fire", "grass+fire", "elevation+fire", "grass+elevation", "grass", "fire", "elevation", "wetland", "wetland + grass", "wetland*grass", "wetland*grass + elevation")
 
 mods.call <- list(mod.null.call, mod.veg1.call, mod.veg2.call, mod.veg3.call, mod.veg4.call, mod.veg5.call, mod.veg6.call, mod.veg7.call)
 
@@ -220,7 +234,7 @@ aic.call <- data.frame(df=sapply(mods.call, function(z) length(coef(z))),
   mutate_at(c("loglik", "AICc", "delta", "weight"), ~round(., 2)) %>%
   dplyr::select(df, loglik, AICc, delta, weight) %>% 
   mutate(response = "call")
-aic.call$model <- c("mod.null.call", "mod.veg1.call", "mod.veg2.call", "mod.veg3.call", "mod.veg4.call", "mod.veg5.call", "mod.veg6.call", "mod.veg7.call")
+aic.call$model <- c("null", "grass+elevation+fire", "grass+fire", "elevation+fire", "grass+elevation", "grass", "fire", "elevation")
 
 aic <- rbind(aic.boom, aic.call) %>% 
   arrange(response, delta)
