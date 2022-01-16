@@ -11,8 +11,15 @@ library(lubridate)
 library(corrplot)
 library(usdm)
 library(dggridR)
+library(rgee)
+library(data.table)
 
 options(scipen=99999)
+
+
+#ee_install()
+ee_Initialize()
+ee_check()
 
 #1. Wrangle location info----
 dat <- read.csv("SurveyDataWithOffsets.csv") %>% 
@@ -314,7 +321,90 @@ table(covs.sf$survey)
 
 write.csv(covs.sf, "SurveyLocationsWithCovs.csv", row.names=FALSE)
 
-#4. Join back to data----
+#4. Get EVI from GEE----
+
+#Add year to survey locations
+covs.year <- read.csv("SurveyLocationsWithCovs.csv") %>% 
+  left_join(dat.locs %>% 
+              dplyr::select(survey, station, year)) %>% 
+  dplyr::select(station, year, X, Y)
+
+#Function to add property with time in milliseconds
+add_date<-function(feature) {
+  date <- ee$Date(ee$String(feature$get("Date")))$millis()
+  feature$set(list(date_millis=date))
+}
+
+#Function to buffer points
+buffer_points <- function(feature){
+  properties <- c("station", "year", "X", "Y")
+  new_geometry <- feature$geometry()$buffer(300)
+  ee$Feature(new_geometry)$copyProperties(feature, properties)
+}
+
+#Loop through each year
+years <- unique(covs.year$year)
+
+for(i in 1:length(years)){
+  
+  year.i <- years[i]
+  
+  data.i <- covs.year %>% 
+    dplyr::filter(year==year.i)
+  
+  #Create SF object
+  datasf <- st_as_sf(data.i, coords = c('X','Y'), crs = 26912) %>% 
+    st_transform(crs=4326)
+  
+  #Send data to GEE
+  data <- sf_as_ee(datasf)
+  
+  #Transform day into milliseconds
+  data <-data$map(add_date)
+  
+  #Buffer points
+  data.buff <- data$map(buffer_points)
+  
+  #11. Load EVI image collection
+  if(year.i==2020){
+    start <- paste0(year.i, "-06-16")
+    end <- paste0(year.i, "-06-20")
+  }
+  else{
+    start <- paste0(year.i, "-06-24")
+    end <- paste0(year.i, "-06-28")
+  }
+
+  imagecoll<-ee$ImageCollection('LANDSAT/LC08/C01/T1_8DAY_EVI')$filterDate(start,end)
+  image  <- imagecoll$select('EVI')$toBands()
+  
+  #12. Extract buffer mean EVI values
+  image.evi <- image$reduceRegions(collection=data.buff, 
+                                   reducer=ee$Reducer$mean(), 
+                                   scale=30)
+  
+  #13. Export EVI task to google drive
+  task_vector <- ee_table_to_drive(collection=image.evi,
+                                   description=paste0("WLNP_EVI_",year.i),
+                                   folder="MCP",
+                                   timePref=FALSE)
+  task_vector$start()
+  ee_monitoring(task_vector) # optional
+  
+}
+
+#Get list of GEE output files
+files <- data.frame(file = list.files("GEE/")) %>% 
+  separate(file, into=c("image", "scale", "year", "loop"), remove=FALSE) %>%
+  dplyr::select(file, year) %>% 
+  mutate(filepath = paste0("GEE/", file))
+
+#Import files
+data.evi <- readr::read_csv(files$filepath, show_col_types = FALSE) %>% 
+  dplyr::select(station, year, mean) %>% 
+  rename(evi = mean)
+
+#5. Join back to data----
 dat <- read.csv("SurveyDataWithOffsets.csv")
 
 dat.covs <- dat %>% 
@@ -340,6 +430,7 @@ dat.covs <- dat %>%
          station = gsub(pattern="Highway 6 North 05", replacement="HWY6-5", x=station)) %>% 
   dplyr::filter(!station %in% dat.na$station) %>% 
   left_join(covs.sf) %>% 
+  left_join(data.evi) %>% 
   mutate(FireTime=year-FireHistory,
          FireTime=ifelse(FireTime < 0, NA, FireTime),
          FireTime=ifelse(is.na(FireTime), 200, FireTime),
@@ -425,7 +516,7 @@ write.csv(dat.thin, "SurveyDataWithCovs.csv", row.names = FALSE)
 
 #6. VIF----
 covs.vif <- read.csv("SurveyDataWithCovs.csv") %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wet.300, wetland.300, FireTime) %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wet.300, wetland.300, FireTime, evi) %>% 
   unique()
 M <- cor(covs.vif, use="complete.obs")
 M
@@ -435,7 +526,7 @@ vif(covs.vif)
 #take out wet
 
 covs.vif <- read.csv("SurveyDataWithCovs.csv") %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wetland.300, FireTime) %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wetland.300, FireTime, evi) %>% 
   unique()
 M <- cor(covs.vif, use="complete.obs")
 M
@@ -445,7 +536,7 @@ vif(covs.vif)
 #take out height
 
 covs.vif <- read.csv("SurveyDataWithCovs.csv") %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, pine.300, sand.300, trails.300, water.300, wetland.300, FireTime) %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, pine.300, sand.300, trails.300, water.300, wetland.300, FireTime, evi) %>% 
   unique()
 
 M <- cor(covs.vif, use="complete.obs")
