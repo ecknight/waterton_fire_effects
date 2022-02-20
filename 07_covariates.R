@@ -2,6 +2,13 @@
 #author: Elly C. Knight
 #created: November 7, 2021
 
+library(rgee)
+
+#ee_clean_pyenv()
+#ee_install()
+ee_Initialize()
+ee_check()
+
 library(tidyverse)
 library(sf)
 library(raster)
@@ -11,15 +18,9 @@ library(lubridate)
 library(corrplot)
 library(usdm)
 library(dggridR)
-library(rgee)
 library(data.table)
 
 options(scipen=99999)
-
-
-#ee_install()
-ee_Initialize()
-ee_check()
 
 #1. Wrangle location info----
 dat <- read.csv("SurveyDataWithOffsets.csv") %>% 
@@ -320,6 +321,7 @@ covs.sf <- dat.sf %>%
 table(covs.sf$survey)
 
 write.csv(covs.sf, "SurveyLocationsWithCovs.csv", row.names=FALSE)
+covs.sf <- read.csv("SurveyLocationsWithCovs.csv")
 
 #4. Get EVI from GEE----
 
@@ -327,7 +329,8 @@ write.csv(covs.sf, "SurveyLocationsWithCovs.csv", row.names=FALSE)
 covs.year <- read.csv("SurveyLocationsWithCovs.csv") %>% 
   left_join(dat.locs %>% 
               dplyr::select(survey, station, year)) %>% 
-  dplyr::select(station, year, X, Y)
+  dplyr::select(station, year, X, Y) %>% 
+  arrange(year)
 
 #Function to add property with time in milliseconds
 add_date<-function(feature) {
@@ -343,7 +346,9 @@ buffer_points <- function(feature){
 }
 
 #Loop through each year
-years <- unique(covs.year$year)
+years <- unique(covs.year$year) 
+start <- c("2016-06-01", "2017-06-01", "2018-06-01", "2019-06-09", "2020-06-17", "2021-06-01")
+end <- c("2016-06-03", "2017-06-03", "2018-06-03", "2019-06-11", "2020-06-19", "2021-06-03")
 
 for(i in 1:length(years)){
   
@@ -366,16 +371,7 @@ for(i in 1:length(years)){
   data.buff <- data$map(buffer_points)
   
   #11. Load EVI image collection
-  if(year.i==2020){
-    start <- paste0(year.i, "-06-16")
-    end <- paste0(year.i, "-06-20")
-  }
-  else{
-    start <- paste0(year.i, "-06-24")
-    end <- paste0(year.i, "-06-28")
-  }
-
-  imagecoll<-ee$ImageCollection('LANDSAT/LC08/C01/T1_8DAY_EVI')$filterDate(start,end)
+  imagecoll<-ee$ImageCollection('LANDSAT/LC08/C01/T1_8DAY_EVI')$filterDate(start[i],end[i])
   image  <- imagecoll$select('EVI')$toBands()
   
   #12. Extract buffer mean EVI values
@@ -386,7 +382,7 @@ for(i in 1:length(years)){
   #13. Export EVI task to google drive
   task_vector <- ee_table_to_drive(collection=image.evi,
                                    description=paste0("WLNP_EVI_",year.i),
-                                   folder="MCP",
+                                   folder="WLNP",
                                    timePref=FALSE)
   task_vector$start()
   ee_monitoring(task_vector) # optional
@@ -523,17 +519,17 @@ M
 corrplot(M)
 
 vif(covs.vif)
-#take out wet
+#take out height
 
 covs.vif <- read.csv("SurveyDataWithCovs.csv") %>% 
-  dplyr::select(Elevation, cover.300, develop.300, grass.300, height.300, pine.300, sand.300, trails.300, water.300, wetland.300, FireTime, evi) %>% 
+  dplyr::select(Elevation, cover.300, develop.300, grass.300, pine.300, sand.300, trails.300, water.300, wet.300, wetland.300, FireTime, evi) %>% 
   unique()
 M <- cor(covs.vif, use="complete.obs")
 M
 corrplot(M)
 
 vif(covs.vif)
-#take out height
+#take out wet
 
 covs.vif <- read.csv("SurveyDataWithCovs.csv") %>% 
   dplyr::select(Elevation, cover.300, develop.300, grass.300, pine.300, sand.300, trails.300, water.300, wetland.300, FireTime, evi) %>% 
