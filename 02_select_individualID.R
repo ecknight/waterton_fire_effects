@@ -24,12 +24,26 @@ rec.b <- val %>%
   sample_n(1) %>% 
   ungroup()
 
-#3. Bind to validation results----
+#3. Identify recordings with calls----
+rec.c <- val %>% 
+  dplyr::select(Site, Filename) %>% 
+  unique() %>% 
+  group_by(Site) %>% 
+  sample_n(1) %>% 
+  ungroup()
+
+#4. Bind to validation results----
 val.b <- val %>% 
   dplyr::filter(Filename %in% rec.b$Filename) %>% 
   mutate(Individual="") %>% 
   dplyr::select("Filename", "TimeOffset", "Duration", "Level", "Quality", "Score", "Comments", "Individual")
 
+val.c <- val %>% 
+  dplyr::filter(Filename %in% rec.c$Filename) %>% 
+  mutate(Individual="") %>% 
+  dplyr::select("Filename", "TimeOffset", "Duration", "Level", "Quality", "Score", "Comments", "Individual")
+
 #4. Write out----
-write.table(val.b, "IndividualID.txt", sep="\t", row.names=FALSE,col.names=FALSE, quote=FALSE)
+write.table(val.b, "IndividualID_boom.txt", sep="\t", row.names=FALSE,col.names=FALSE, quote=FALSE)
+write.table(val.c, "IndividualID_call.txt", sep="\t", row.names=FALSE,col.names=FALSE, quote=FALSE)
 
