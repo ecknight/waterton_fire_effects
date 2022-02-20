@@ -71,3 +71,7 @@ plot.density <- ggplot(pred.long) +
 
 ggsave(plot.density, 
        file = "Figs/SpatialPredictions_Facet.jpeg", width = 16, height = 7, device="jpeg")
+
+#5. Territory size----
+boom.max <- max(pred$densitycell.boom)
+territory <- 1/boom.max*0.4229*0.3041259
