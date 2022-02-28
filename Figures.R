@@ -7,6 +7,7 @@ library(ggmap)
 library(ggspatial)
 library(patchwork)
 library(gridExtra)
+library(stars)
 
 my.theme <- theme_classic() +
   theme(text=element_text(size=12, family="Arial"),
@@ -116,24 +117,35 @@ wlnp <- read_sf("/Volumes/SSD/GIS/Administrative/Canada/National Parks/CLAB_AB_2
 wlnp.sp <- as_Spatial(wlnp)
 
 #Get fire perimeter
-kenow <- read_sf("/Volumes/SSD/GIS/Projects/WLNP/Kenow 2017 Burn severity/Kenow_severity_classes.shp") %>% 
-#  st_union() %>% 
-  st_transform(crs=4326)
-kenow.sp <- as_Spatial(kenow)
-
-fire <- read_sf("/Volumes/SSD/GIS/Projects/WLNP/Fire History/Fire_history2.shp") %>% 
-  dplyr::filter(YEAR==2017) %>% 
+fire <- read_sf("/Volumes/SSD/GIS/LandCover/HistoricalWildfirePerimeters2020/WildfirePerimeters1931to2020.shp") %>% 
+  dplyr::filter(ALIAS=="Kenow Fire") %>% 
   st_transform(crs=4326) %>% 
   st_make_valid() %>% 
-  st_union()
+  st_union() %>% 
+  st_as_sf()
+
+plot(fire)
+
+fire.bb <- st_bbox(fire)
 
 fire.sp <- as_Spatial(fire)
+
+r <- raster(ncol=500, nrow=500)
+extent(r) <- extent(fire.sp)
+fire.r <- rasterize(fire.sp, r)
+plot(fire.r)
+
+col <- c("#00000066")
+fire.mat <- raster::as.matrix(fire.r)
+fire.col <- matrix(col[cut(fire.mat, 2)], nrow=nrow(fire.mat), ncol=ncol(fire.mat))
+
+ggmap(map_transparent) +
+  inset_raster(fire.col, fire.bb[1], fire.bb[3], fire.bb[2], fire.bb[4])
 
 #map
 map.site <- ggmap(map_transparent) +
   geom_polygon(data=wlnp.sp, aes(x=long, y=lat), fill=NA, colour="black") +
-#  geom_polygon(data=kenow.sp, aes(x=long, y=lat), fill=NA, colour="red", alpha = 0.4) +
-#  geom_polygon(data=fire.sp, aes(x=long, y=lat), fill="red", alpha=0.4) +
+  inset_raster(fire.col, fire.bb[1], fire.bb[3], fire.bb[2], fire.bb[4]) +
   geom_spatial_point(aes(x = lon, y = lat,
                          colour=factor(year),
                          shape=survey),
@@ -162,7 +174,7 @@ map.site <- ggmap(map_transparent) +
   theme(legend.position = "right",
         axis.text.x.bottom=element_text(size=10),
         axis.text.y.left=element_text(size=10))
-#map.site
+map.site
 
 #1c. Put it together####
 plot.sa <- map.site +
