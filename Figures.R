@@ -1,4 +1,5 @@
 library(tidyverse)
+library(lubridate)
 library(sf)
 library(sp)
 library(raster)
@@ -242,38 +243,48 @@ ggsave(plot=grid.arrange(plot.boom.offset, plot.call.offset, ncol=2), filename="
 newdat <- read.csv("OccupancyModelPredictions.csv")
 
 newdat.grass <- newdat %>% 
-  dplyr::filter(elevation==1540)
+  dplyr::filter(elevation==1570)
 
 newdat.elev <- newdat %>% 
-  dplyr::filter(grass==0.5)
+  dplyr::filter(grass==0.14)
 
 plot.boom.grass <- ggplot(newdat.grass) +
-  geom_line(aes(x=grass, y=delta.boom)) +
-  xlab("Proportion of grassland in 300 m") +
+  geom_ribbon(aes(x=grass, ymin=delta.boom.low, ymax = delta.boom.high), alpha = 0.5) +
+  geom_line(aes(x=grass, y=delta.boom), show.legend = FALSE) +
+  xlab("") +
   ylab("Territorial habitat suitability") +
   my.theme
 
 plot.call.grass <- ggplot(newdat.grass) +
+  geom_ribbon(aes(x=grass, ymin=delta.call.low, ymax = delta.call.high), alpha = 0.5) +
   geom_line(aes(x=grass, y=delta.call)) +
   xlab("Proportion of grassland in 300 m") +
   ylab("Home range habitat suitability") +
   my.theme
 
-plot.call.elev <- ggplot(newdat.elev) +
-  geom_line(aes(x=elevation, y=delta.call)) +
-  xlab("Elevation") +
-  ylab("Home range habitat suitability") +
+plot.boom.elev <- ggplot(newdat.elev) +
+  geom_ribbon(aes(x=elevation, ymin=delta.boom.low, ymax = delta.boom.high), alpha = 0.5) +
+  geom_line(aes(x=elevation, y=delta.boom))  +
+  xlab("") +
+  ylab("") +
   my.theme
 
-ggsave(grid.arrange(plot.boom.grass, plot.call.grass, plot.call.elev, ncol=3), 
-       file = "Figs/CovariatePredictions.jpeg", width = 16, height = 7, device="jpeg")
+plot.call.elev <- ggplot(newdat.elev) +
+  geom_ribbon(aes(x=elevation, ymin=delta.call.low, ymax = delta.call.high), alpha = 0.5) +
+  geom_line(aes(x=elevation, y=delta.call)) +
+  xlab("Elevation") +
+  ylab("") +
+  my.theme
+
+ggsave(grid.arrange(plot.boom.grass, plot.boom.elev, plot.call.grass, plot.call.elev, ncol=2, nrow=2), 
+       file = "Figs/CovariatePredictions.jpeg", width = 8, height = 8, device="jpeg")
 
 #FIGURE 6. SPATIAL PREDICTIONS####
 pred <- read.csv("SpatialPredictions.csv")
 
 plot.density.boom <- ggplot(pred) +
   geom_raster(aes(x = x, y = y, fill=densityha.boom), na.rm=TRUE) +
-  scale_fill_viridis_c(name="Territorial males\nper ha") +
+  scale_fill_viridis_c(name="Territorial\nmales\nper ha") +
   xlab("") +
   ylab("") +
   my.theme +
@@ -286,7 +297,7 @@ plot.density.boom <- ggplot(pred) +
 
 plot.density.call <- ggplot(pred) +
   geom_raster(aes(x = x, y = y, fill=densityha.call), na.rm=TRUE) +
-  scale_fill_viridis_c(name="Total males\nper ha") + 
+  scale_fill_viridis_c(name="Total\nmales\nper ha") + 
   xlab("") +
   ylab("") +
   my.theme +
@@ -298,7 +309,7 @@ plot.density.call <- ggplot(pred) +
         axis.ticks.y = element_blank())
 
 ggsave(grid.arrange(plot.density.boom, plot.density.call, ncol = 2), 
-       file = "Figs/SpatialPredictions.jpeg", width = 16, height = 7, device="jpeg")
+       file = "Figs/SpatialPredictions.jpeg", width = 12, height = 5, device="jpeg")
 
 
 ####### SUMMARY STATS FOR THINGS#####
