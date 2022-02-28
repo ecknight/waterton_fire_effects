@@ -150,38 +150,113 @@ ic
 cl0p.extra <- cl0p
 #Poisson  with no covs for both detection types
 
-#4. Estimate
+#4. Sandwich estimator for variance----
+Xp <- X1[!duplicated(abu.boom$station),]
+rownames(Xp) <- abu$sa[!duplicated(abu$sa)]
 
 #Boom
-## mean of the poisson (including 0 counts and offsets too)
+CF.boom <- NULL
+for (i in 1:300) {
+  abux <- NULL
+  abuj <- abu.boom[sample.int(nrow(abu.boom), replace=TRUE),]
+  abux <- rbind(abux, abuj[!duplicated(abuj$station),])
+  
+  Y1i <- abux$abundance
+  X1i <- model.matrix(~ 1, abux)
+  
+  cl1pi <- try(zi.fit(Y1i, X1i, distr="pois", type="CL", hessian=TRUE)$CL)
+  if (!inherits(cl1pi, "try-error"))
+    est <- data.frame(lambda = exp(cl1pi$coef),
+                      i = i)
+  CF.boom <- rbind(CF.boom, est)
+}
+
+#call
+CF.call <- NULL
+for (i in 1:300) {
+  abux <- NULL
+  abuj <- abu.call[sample.int(nrow(abu.call), replace=TRUE),]
+  abux <- rbind(abux, abuj[!duplicated(abuj$station),])
+  
+  Y1i <- abux$abundance
+  X1i <- model.matrix(~ 1, abux)
+  
+  cl1pi <- try(zi.fit(Y1i, X1i, distr="pois", type="CL", hessian=TRUE)$CL)
+  if (!inherits(cl1pi, "try-error"))
+    est <- data.frame(lambda = exp(cl1pi$coef),
+                      i = i)
+  CF.call <- rbind(CF.call, est)
+}
+
+#extraterritorial
+CF.extra <- NULL
+for (i in 1:300) {
+  abux <- NULL
+  abuj <- abu.extra[sample.int(nrow(abu.extra), replace=TRUE),]
+  abux <- rbind(abux, abuj[!duplicated(abuj$station),])
+  
+  Y1i <- abux$abundance
+  X1i <- model.matrix(~ 1, abux)
+  
+  cl1pi <- try(zi.fit(Y1i, X1i, distr="pois", type="CL", hessian=TRUE)$CL)
+  if (!inherits(cl1pi, "try-error"))
+    est <- data.frame(lambda = exp(cl1pi$coef),
+                      i = i)
+  CF.extra <- rbind(CF.extra, est)
+}
+
+#5. Estimates----
+
+#Boom
+# mean of the poisson (including 0 counts and offsets too)
 lambda.boom <- exp(cl0p.boom$coef)
 lambda.boom
-## P(N=0) based on Poisson, which is the suitable but unoccupied probability
-exp(-lambda.boom)
+# mean of the sandwich estimator
+lambda.boom <- CF.boom %>% 
+  summarize(quantlow = quantile(lambda, prob=0.025),
+            quanthigh = quantile(lambda, 0.975),
+            lambda=mean(lambda)) %>% 
+  mutate(detection = "boom")
+lambda.boom
+# P(N=0) based on Poisson, which is the suitable but unoccupied probability
+exp(-lambda.boom$lambda)
 ## suitable and occupied
-1-exp(-lambda.boom)
+1-exp(-lambda.boom$lambda)
 
 #Call
-## mean of the poisson (including 0 counts and offsets too)
+# mean of the poisson (including 0 counts and offsets too)
 lambda.call <- exp(cl0p.call$coef)
 lambda.call
-## P(N=0) based on Poisson, which is the suitable but unoccupied probability
-exp(-lambda.call)
-## suitable and occupied
-1-exp(-lambda.call)
+## mean of sandwich estimate
+lambda.call <- CF.call %>% 
+  summarize(quantlow = quantile(lambda, prob=0.025),
+            quanthigh = quantile(lambda, 0.975),
+            lambda=mean(lambda)) %>% 
+  mutate(detection = "call")
+lambda.call
+# P(N=0) based on Poisson, which is the suitable but unoccupied probability
+exp(-lambda.call$lambda)
+# suitable and occupied
+1-exp(-lambda.call$lambda)
 
 #Extraterritorial
 ## mean of the poisson (including 0 counts and offsets too)
 lambda.extra <- exp(cl0p.extra$coef)
 lambda.extra
+## mean of sandwich estimate
+lambda.extra <- CF.extra %>% 
+  summarize(quantlow = quantile(lambda, prob=0.025),
+            quanthigh = quantile(lambda, 0.975),
+            lambda=mean(lambda)) %>% 
+  mutate(detection = "extra")
+lambda.extra
 ## P(N=0) based on Poisson, which is the suitable but unoccupied probability
-exp(-lambda.extra)
+exp(-lambda.extra$lambda)
 ## suitable and occupied
-1-exp(-lambda.extra)
+1-exp(-lambda.extra$lambda)
 
-#5. Save out----
-lambda <- data.frame(detection=c("boom", "call", "extra"),
-                     lambda=c(lambda.boom, lambda.call, lambda.extra))
+#6. Save out----
+lambda <- rbind(lambda.boom, lambda.call, lambda.extra)
 lambda
 
 write.csv(lambda, "LambdaEstimates.csv", row.names = FALSE)
