@@ -276,7 +276,7 @@ Xveg19.extra <- model.matrix(~firetime.s, station.extra)
 method <- "DE" # slow and sure
 
 #Boom
-set.seed(1234)
+set.seed(999)
 mod.null.boom <- mvocc(y.boom, X.boom, Z.boom, p.boom, lamvec.boom, method=method)
 mod.veg1.boom <- mvocc(y.boom, Xveg1.boom, Z.boom, p.boom, lamvec.boom, method=method)
 mod.veg2.boom <- mvocc(y.boom, Xveg2.boom, Z.boom, p.boom, lamvec.boom, method=method)
@@ -298,7 +298,7 @@ mod.veg17.boom <- mvocc(y.boom, Xveg17.boom, Z.boom, p.boom, lamvec.boom, method
 mod.veg18.boom <- mvocc(y.boom, Xveg18.boom, Z.boom, p.boom, lamvec.boom, method=method)
 mod.veg19.boom <- mvocc(y.boom, Xveg19.boom, Z.boom, p.boom, lamvec.boom, method=method)
 
-set.seed(1234)
+set.seed(999)
 mod.null.call <- mvocc(y.call, X.call, Z.call, p.call, lamvec.call, method=method)
 mod.veg1.call <- mvocc(y.call, Xveg1.call, Z.call, p.call, lamvec.call, method=method)
 mod.veg2.call <- mvocc(y.call, Xveg2.call, Z.call, p.call, lamvec.call, method=method)
@@ -320,7 +320,7 @@ mod.veg17.call <- mvocc(y.call, Xveg17.call, Z.call, p.call, lamvec.call, method
 mod.veg18.call <- mvocc(y.call, Xveg18.call, Z.call, p.call, lamvec.call, method=method)
 mod.veg19.call <- mvocc(y.call, Xveg19.call, Z.call, p.call, lamvec.call, method=method)
 
-set.seed(1234)
+set.seed(999)
 mod.null.extra <- mvocc(y.extra, X.extra, Z.extra, p.extra, lamvec.extra, method=method)
 mod.veg1.extra <- mvocc(y.extra, Xveg1.extra, Z.extra, p.extra, lamvec.extra, method=method)
 mod.veg2.extra <- mvocc(y.extra, Xveg2.extra, Z.extra, p.extra, lamvec.extra, method=method)
@@ -394,9 +394,9 @@ aic.extra$model <- c("null", "grass*cover+elevation+fire", "grass+cover+elevatio
 aic.extra <- aic.extra %>% 
   arrange(delta)
 
-
 aic <- rbind(aic.boom, aic.call, aic.extra) %>% 
-  arrange(response, delta)
+  arrange(response, delta) %>% 
+  dplyr::select(model, df, loglik, AICc, delta, weight, response)
 View(aic)
 
 write.csv(aic, "OccupancyModelSelection.csv", row.names = FALSE)
@@ -413,9 +413,6 @@ summary(mod.null.extra)
 best.extra <- mod.null.extra
 saveRDS(best.call, "OccupancyModel_Extra.rds")
 
-save.image("DEOccupancyModels.Rdata")
-load("DEOccupancyModels.Rdata")
-
 #9. Model predictions----
 #Newdata
 newdat <- data.frame(expand_grid(grass = seq(0, 1, 0.01),
@@ -423,46 +420,43 @@ newdat <- data.frame(expand_grid(grass = seq(0, 1, 0.01),
   mutate(grass.s = (grass - mean(dat$grass.300))/sd(dat$grass.300),
          elevation.s = (elevation - mean(dat$Elevation))/sd(dat$Elevation))
 
-
-
 #Predict
 Xnewdat.boom <- model.matrix(~grass.s + elevation.s, newdat)
 newdat$delta.boom <- plogis(drop(Xnewdat.boom %*% best.boom$coef[1:3]))
-#newdat.boom$delta.se <- plogis(drop(Xnewdat.boom %*% best.boom[["summary"]][7:8]))
+newdat$delta.boom.sd <- plogis(drop(Xnewdat.boom%*% best.boom$summary[1:3,2]))
+newdat$delta.boom.high <- newdat$delta.boom + newdat$delta.boom.sd/sqrt(length(X.boom))*1.96
+newdat$delta.boom.low <- newdat$delta.boom - newdat$delta.boom.sd/sqrt(length(X.boom))*1.96
 
 Xnewdat.call <- model.matrix(~grass.s + elevation.s, newdat)
 newdat$delta.call <- plogis(drop(Xnewdat.call %*% best.call$coef[1:3]))
+newdat$delta.call.sd <- plogis(drop(Xnewdat.call%*% best.call$summary[1:3,2]))
+newdat$delta.call.high <- newdat$delta.call + newdat$delta.call.sd/sqrt(length(X.call))*1.96
+newdat$delta.call.low <- newdat$delta.call - newdat$delta.call.sd/sqrt(length(X.call))*1.96
 
 write.csv(newdat, "OccupancyModelPredictions.csv", row.names = FALSE)
 
 #Plot
-newdat.grass.boom <- newdat %>% 
-  dplyr::filter(elevation==1500,
-                response=="boom")
+newdat.grass <- newdat %>% 
+  dplyr::filter(elevation==round(mean(dat$Elevation), 0))
 
-newdat.elev.boom <- newdat %>% 
-  dplyr::filter(grass==0.5,
-                response=="boom")
+newdat.elev <- newdat %>% 
+  dplyr::filter(grass==round(mean(dat$grass.300), 2))
 
-newdat.grass.call <- newdat %>% 
-  dplyr::filter(elevation==1500,
-                response=="call")
+plot.boom.grass <- ggplot(newdat.grass) +
+  geom_ribbon(aes(x=grass, ymin=delta.boom.low, ymax = delta.boom.high), alpha = 0.5) +
+  geom_line(aes(x=grass, y=delta.boom), show.legend = FALSE)
 
-newdat.elev.call <- newdat %>% 
-  dplyr::filter(grass==0.5,
-                response=="call")
+plot.call.grass <- ggplot(newdat.grass) +
+  geom_ribbon(aes(x=grass, ymin=delta.call.low, ymax = delta.call.high), alpha = 0.5) +
+  geom_line(aes(x=grass, y=delta.call))
 
-plot.boom.grass <- ggplot(newdat.grass.boom) +
-  geom_line(aes(x=grass, y=delta), show.legend = FALSE)
+plot.boom.elev <- ggplot(newdat.elev) +
+  geom_ribbon(aes(x=elevation, ymin=delta.boom.low, ymax = delta.boom.high), alpha = 0.5) +
+  geom_line(aes(x=elevation, y=delta.boom))
 
-plot.call.grass <- ggplot(newdat.grass.call) +
-  geom_line(aes(x=grass, y=delta))
-
-plot.boom.elev <- ggplot(newdat.elev.boom) +
-  geom_line(aes(x=elevation, y=delta))
-
-plot.call.elev <- ggplot(newdat.elev.call) +
-  geom_line(aes(x=elevation, y=delta))
+plot.call.elev <- ggplot(newdat.elev) +
+  geom_ribbon(aes(x=elevation, ymin=delta.call.low, ymax = delta.call.high), alpha = 0.5) +
+  geom_line(aes(x=elevation, y=delta.call))
 
 grid.arrange(plot.boom.grass, plot.call.grass,
              plot.boom.elev, plot.call.elev,
@@ -490,9 +484,12 @@ summary(1-exp(-lambda$lambda[2]))
 summary(as.numeric(p.boom))
 summary(as.numeric(p.call))
 
-#10d. Used----
+#10d. Present (closure)----
 plogis(best.boom$coef[4])
+plogis(best.boom$summary[4,2])
+
 plogis(best.call$coef[4])
+plogis(best.call$summary[4,2])
 
 #10e. Density----
 edr <- read.csv("EDR.csv")[1,]$eda
@@ -509,3 +506,7 @@ estimates.call <- delta.call %>%
   mutate(density = delta*lambda/edr)
 mean(estimates.call$density)
   
+
+save.image("DEOccupancyModels.Rdata")
+#load("DEOccupancyModels.Rdata")
+
