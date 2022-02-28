@@ -199,44 +199,32 @@ hist(df.extra$time/60)
 mods.boom <- list(
   m0 = survreg(sv ~ 1, df.boom, dist="exponential"),
   m1 = survreg(sv ~ jday, df.boom, dist="exponential"),
-  m2 = survreg(sv ~ jday + jday2, df.boom, dist="exponential"),
-  m3 = survreg(sv ~ sin, df.boom, dist="exponential"),
-  m4 = survreg(sv ~ cos, df.boom, dist="exponential"),
-  m5 = survreg(sv ~ sin + cos, df.boom, dist="exponential"),
-  m6 = survreg(sv ~ jday + sin, df.boom, dist="exponential"),
-  m7 = survreg(sv ~ jday + cos, df.boom, dist="exponential"),
-  m8 = survreg(sv ~ jday + sin + cos, df.boom, dist="exponential"),
-  m9 = survreg(sv ~ jday + jday2 + sin, df.boom, dist="exponential"),
-  m10 = survreg(sv ~ jday + jday2 + cos, df.boom, dist="exponential"),
-  m11 = survreg(sv ~ jday + jday2 + sin + cos, df.boom, dist="exponential"))
+  m2 = survreg(sv ~ sin, df.boom, dist="exponential"),
+  m3 = survreg(sv ~ cos, df.boom, dist="exponential"),
+  m4 = survreg(sv ~ sin + cos, df.boom, dist="exponential"),
+  m5 = survreg(sv ~ jday + sin, df.boom, dist="exponential"),
+  m6 = survreg(sv ~ jday + cos, df.boom, dist="exponential"),
+  m7 = survreg(sv ~ jday + sin + cos, df.boom, dist="exponential"))
 
 mods.call <- list(
   m0 = survreg(sv ~ 1, df.call, dist="exponential"),
   m1 = survreg(sv ~ jday, df.call, dist="exponential"),
-  m2 = survreg(sv ~ jday + jday2, df.call, dist="exponential"),
-  m3 = survreg(sv ~ sin, df.call, dist="exponential"),
-  m4 = survreg(sv ~ cos, df.call, dist="exponential"),
-  m5 = survreg(sv ~ sin + cos, df.call, dist="exponential"),
-  m6 = survreg(sv ~ jday + sin, df.call, dist="exponential"),
-  m7 = survreg(sv ~ jday + cos, df.call, dist="exponential"),
-  m8 = survreg(sv ~ jday + sin + cos, df.call, dist="exponential"),
-  m9 = survreg(sv ~ jday + jday2 + sin, df.call, dist="exponential"),
-  m10 = survreg(sv ~ jday + jday2 + cos, df.call, dist="exponential"),
-  m11 = survreg(sv ~ jday + jday2 + sin + cos, df.call, dist="exponential"))
+  m2 = survreg(sv ~ sin, df.call, dist="exponential"),
+  m3 = survreg(sv ~ cos, df.call, dist="exponential"),
+  m4 = survreg(sv ~ sin + cos, df.call, dist="exponential"),
+  m5 = survreg(sv ~ jday + sin, df.call, dist="exponential"),
+  m6 = survreg(sv ~ jday + cos, df.call, dist="exponential"),
+  m7 = survreg(sv ~ jday + sin + cos, df.call, dist="exponential"))
 
 mods.extra <- list(
   m0 = survreg(sv ~ 1, df.extra, dist="exponential"),
   m1 = survreg(sv ~ jday, df.extra, dist="exponential"),
-  m2 = survreg(sv ~ jday + jday2, df.extra, dist="exponential"),
-  m3 = survreg(sv ~ sin, df.extra, dist="exponential"),
-  m4 = survreg(sv ~ cos, df.extra, dist="exponential"),
-  m5 = survreg(sv ~ sin + cos, df.extra, dist="exponential"),
-  m6 = survreg(sv ~ jday + sin, df.extra, dist="exponential"),
-  m7 = survreg(sv ~ jday + cos, df.extra, dist="exponential"),
-  m8 = survreg(sv ~ jday + sin + cos, df.extra, dist="exponential"),
-  m9 = survreg(sv ~ jday + jday2 + sin, df.extra, dist="exponential"),
-  m10 = survreg(sv ~ jday + jday2 + cos, df.extra, dist="exponential"),
-  m11 = survreg(sv ~ jday + jday2 + sin + cos, df.extra, dist="exponential"))
+  m2 = survreg(sv ~ sin, df.extra, dist="exponential"),
+  m3 = survreg(sv ~ cos, df.extra, dist="exponential"),
+  m4 = survreg(sv ~ sin + cos, df.extra, dist="exponential"),
+  m5 = survreg(sv ~ jday + sin, df.extra, dist="exponential"),
+  m6 = survreg(sv ~ jday + cos, df.extra, dist="exponential"),
+  m7 = survreg(sv ~ jday + sin + cos, df.extra, dist="exponential"))
 
 #10. Compare with AIC----
 aic.boom <- data.frame(df=sapply(mods.boom, function(z) length(coef(z))),
@@ -248,8 +236,8 @@ aic.boom <- data.frame(df=sapply(mods.boom, function(z) length(coef(z))),
          weight = rellike/sum(rellike)) %>%
   mutate_at(c("loglik", "AICc", "delta", "weight"), ~round(., 2)) %>%
   dplyr::select(df, loglik, AICc, delta, weight)
+aic.boom$model <- c("1", "jday", "sin", "cos", "sin + cos", "jday + sin", "jday + cos", "jday + sin + cos")
 aic.boom
-
 
 aic.call <- data.frame(df=sapply(mods.call, function(z) length(coef(z))),
                        AIC=sapply(mods.call, AIC),
@@ -260,6 +248,7 @@ aic.call <- data.frame(df=sapply(mods.call, function(z) length(coef(z))),
          weight = rellike/sum(rellike)) %>%
   mutate_at(c("loglik", "AICc", "delta", "weight"), ~round(., 2)) %>%
   dplyr::select(df, loglik, AICc, delta, weight)
+aic.call$model <- c("1", "jday", "sin", "cos", "sin + cos", "jday + sin", "jday + cos", "jday + sin + cos")
 aic.call
 
 aic.extra <- data.frame(df=sapply(mods.extra, function(z) length(coef(z))),
@@ -271,7 +260,21 @@ aic.extra <- data.frame(df=sapply(mods.extra, function(z) length(coef(z))),
          weight = rellike/sum(rellike)) %>%
   mutate_at(c("loglik", "AICc", "delta", "weight"), ~round(., 2)) %>%
   dplyr::select(df, loglik, AICc, delta, weight)
+aic.extramodel <- c("1", "jday", "sin", "cos", "sin + cos", "jday + sin", "jday + cos", "jday + sin + cos")
 aic.extra
+
+aic <- rbind(aic.boom %>% 
+               mutate(response="boom"),
+             aic.call %>% 
+               mutate(response="call")) %>% 
+  dplyr::select(model, df, loglik, AICc, delta, weight, response) %>% 
+  mutate(loglik = round(loglik, 2),
+         AICc = round(AICc, 2),
+         delta = round(delta, 2),
+         weight = round(weight, 2)) %>% 
+  arrange(response, delta)
+
+write.csv(aic, "OffsetAICresults.csv", row.names = FALSE)
 
 #11. Summary of predictions----
 #Boom
