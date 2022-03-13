@@ -305,7 +305,16 @@ plot.density.boom <- ggplot(pred) +
         axis.ticks.x = element_blank(),
         axis.line.y = element_blank(),
         axis.text.y = element_blank(),
-        axis.ticks.y = element_blank())
+        axis.ticks.y = element_blank()) +
+  ggsn::scalebar(x.min = max(pred$x)-10000, x.max = max(pred$x), 
+                 y.min = max(pred$y) - 1000, y.max = max(pred$y), 
+                 transform=FALSE,
+                 dist=5, dist_unit="km",
+                 box.fill=c("grey80", "grey20"),
+                 box.color="grey20",
+                 height = 0.8, 
+                 st.dist = 0.6)
+#plot.density.boom
 
 plot.density.call <- ggplot(pred) +
   geom_raster(aes(x = x, y = y, fill=densityha.call), na.rm=TRUE) +
@@ -321,7 +330,7 @@ plot.density.call <- ggplot(pred) +
         axis.ticks.y = element_blank())
 
 ggsave(grid.arrange(plot.density.boom, plot.density.call, ncol = 2), 
-       file = "Figs/SpatialPredictions.jpeg", width = 12, height = 5, device="jpeg")
+       file = "Figs/SpatialPredictions.jpeg", width = 14, height = 5, device="jpeg")
 
 
 ####### SUMMARY STATS FOR THINGS#####
