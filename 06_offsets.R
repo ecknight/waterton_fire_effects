@@ -177,7 +177,7 @@ df.extra <- df.extra.1st %>%
          jday2 = jday^2,
          start = hour(DateTime) + minute(DateTime)/60,
          tod = start/24,
-         ts = (tsss +2)/8,
+         ts = (tsss+2)/8,
          sin = sin(ts*2*pi),
          cos = cos(ts*2*pi),
          sv = Surv(time/60, detection))
