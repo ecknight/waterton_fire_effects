@@ -46,4 +46,3 @@ val.c <- val %>%
 #4. Write out----
 write.table(val.b, "IndividualID_boom.txt", sep="\t", row.names=FALSE,col.names=FALSE, quote=FALSE)
 write.table(val.c, "IndividualID_call.txt", sep="\t", row.names=FALSE,col.names=FALSE, quote=FALSE)
-
