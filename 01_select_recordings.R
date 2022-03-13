@@ -258,35 +258,3 @@ files.use.sep <- files.use %>%
 
 files.names <- files.2021 %>% 
   inner_join(files.use.sep) 
-
-
-
-
-
-#GRAVEYARD
-
-#Add lat longs
-locs <- read.csv("ExistingSamplingLocations.csv") %>% 
-  dplyr::select(Site, X, Y) %>% 
-  rename(site = Site) %>% 
-  rbind(read.csv("Data/BU_WLNP_locations.csv")) %>% 
-  unique() %>% 
-  dplyr::filter(str_sub(site, 1, 4)=="WLNP") %>% 
-  separate(site, into=c("project", "cluster", "station"), remove=FALSE) %>% 
-  mutate(cluster=as.numeric(cluster),
-         cluster=ifelse(is.na(cluster), "CONI", cluster),
-         station=as.numeric(station),
-         siteloc=paste(project, cluster, station, sep="-"),
-         X=round(as.numeric(X), 5),
-         Y=round(as.numeric(Y), 5)) %>% 
-  dplyr::select(siteloc, X, Y) %>% 
-  unique() %>% 
-  arrange(siteloc) %>% 
-  filter(lead(siteloc)!=siteloc)
-
-files.locs <- files.df %>% 
-  mutate(siteloc = gsub(site, pattern="0", replacement = "")) %>% 
-  left_join(locs) %>% 
-  dplyr::filter(!is.na(X)) %>% 
-  rename(lat=Y, lon=X)
- 
