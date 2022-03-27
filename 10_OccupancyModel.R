@@ -416,7 +416,7 @@ saveRDS(best.call, "OccupancyModel_Extra.rds")
 #9. Model predictions----
 #Newdata
 newdat <- data.frame(expand_grid(grass = seq(0, 1, 0.01),
-                                 elevation = seq(0, 3000, 1))) %>% 
+                                 elevation = seq(round(min(dat$Elevation)), round(max(dat$Elevation)), 1))) %>% 
   mutate(grass.s = (grass - mean(dat$grass.300))/sd(dat$grass.300),
          elevation.s = (elevation - mean(dat$Elevation))/sd(dat$Elevation))
 
