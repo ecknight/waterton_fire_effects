@@ -82,7 +82,12 @@ df.sun <- getSunlightTimes(data=df.locs, tz="Canada/Mountain", keep="sunset") %>
 ggplot(df.sun) +
   geom_histogram(aes(x=tsss))
 
+write.csv(df.sun, "ZeroFilledRecognizerResults.csv", row.names = FALSE)
+
 #4. ID locations with detections----
+
+df.sun <- read.csv("ZeroFilledRecognizerResults.csv")
+
 site.boom <- df.sun %>% 
   filter(detection=="B") %>% 
   dplyr::select(Station) %>% 
@@ -407,6 +412,9 @@ df.hum <- df.hum.sun %>%
          cos = ts*2*pi,
          survey="human") %>% 
   rename(station=Site, detection=Presence)
+
+write.csv(df.hum, "HumanResults.csv", row.names=FALSE)
+
 df.hum$p.boom <- NA
 df.hum$p.call <- 1-exp(-(1/predict(mb.call, newdata = df.hum))*6)
 df.hum$p.extra <- NA
